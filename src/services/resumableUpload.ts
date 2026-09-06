@@ -156,6 +156,9 @@ export class ResumableUploader {
             this.currentByte = this.file.size;
             this.notifyProgress('completed', 100, this.file.size, 0, 0, undefined, fileData.id);
 
+            // Set public sharing link permission so recipient can watch/download without signing in
+            await driveApi.makeFilePublic(fileData.id);
+
             const videoMeta: VideoMetadata = {
               id: fileData.id,
               driveFileId: fileData.id,

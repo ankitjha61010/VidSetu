@@ -141,40 +141,42 @@ export const WatchPage: React.FC = () => {
     );
   };
 
-  // Direct authenticated download handler (avoids Google anti-bot automated queries error page)
+  // Direct download handler (works for anyone with link without requiring sign-in)
   const handleDownloadFile = async () => {
     try {
       setIsDownloading(true);
       let downloaded = false;
 
-      // 1. Try direct authorized Google Drive v3 media fetch
-      try {
-        const token = await googleAuth.getValidAccessToken();
-        if (token) {
-          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+      // 1. If user is already authenticated in this session, use authorized Google Drive API stream
+      if (googleAuth.isAuthenticated()) {
+        try {
+          const token = await googleAuth.getValidAccessToken();
+          if (token) {
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
 
-          if (res.ok) {
-            const blob = await res.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = video.originalFileName || video.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-            downloaded = true;
+            if (res.ok) {
+              const blob = await res.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = video.originalFileName || video.name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+              downloaded = true;
+            }
           }
+        } catch (err) {
+          console.warn('Authenticated blob download fallback:', err);
         }
-      } catch (err) {
-        console.warn('Authenticated blob download fallback:', err);
       }
 
-      // 2. Fallback to webContentLink if authenticated fetch did not trigger
+      // 2. Direct public download for unauthenticated recipients
       if (!downloaded) {
         const downloadUrl = video.webContentLink || `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
         const a = document.createElement('a');

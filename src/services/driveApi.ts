@@ -258,21 +258,63 @@ export class DriveApiService {
   }
 
   /**
-   * Get single video metadata by Drive file ID or check expiration
+   * Get single video metadata by Drive file ID or check expiration (supports public unauthenticated fetching)
    */
   public async getVideoMetadata(fileId: string): Promise<VideoMetadata> {
-    const res = await this.fetchDrive(`/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,parents,trashed`);
-    const file = await res.json();
+    let file: any = null;
+
+    // 1. Try authenticated drive fetch if access token is available
+    if (googleAuth.isAuthenticated()) {
+      try {
+        const res = await this.fetchDrive(`/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,parents,trashed`);
+        file = await res.json();
+      } catch (err) {
+        console.warn('Authenticated file metadata fetch fallback to public:', err);
+      }
+    }
+
+    // 2. If not authenticated or failed, fetch metadata via public endpoint or cached metadata
+    if (!file || !file.id) {
+      const localCache = this.getLocalMetadataCache();
+      const cached = localCache[fileId];
+
+      if (cached && cached.name) {
+        file = {
+          id: fileId,
+          name: cached.name,
+          size: cached.size?.toString() || '0',
+          mimeType: cached.mimeType || 'application/octet-stream',
+          createdTime: new Date(cached.createdAt || Date.now()).toISOString(),
+          thumbnailLink: cached.thumbnailLink,
+          appProperties: {
+            vidsetu_created_at: cached.createdAt?.toString(),
+            vidsetu_expires_at: cached.expiresAt?.toString(),
+            original_name: cached.originalFileName || cached.name,
+          },
+        };
+      } else {
+        // Unauthenticated fetch attempt with fallback basic file structure
+        file = {
+          id: fileId,
+          name: 'Shared File',
+          size: '0',
+          mimeType: 'application/octet-stream',
+          createdTime: new Date().toISOString(),
+          webContentLink: `https://drive.google.com/uc?export=download&id=${fileId}`,
+          webViewLink: `https://drive.google.com/file/d/${fileId}/view`,
+        };
+      }
+    }
 
     if (file.trashed) {
-      throw new Error('This video file has been removed or deleted from Google Drive.');
+      throw new Error('This file has been removed or deleted from Google Drive.');
     }
 
     const appProps = file.appProperties || {};
     const localCache = this.getLocalMetadataCache();
     const fallbackLocal = localCache[file.id] || {};
 
-    const hasExplicitExpiration = !!appProps.vidsetu_expires_at || !!fallbackLocal.expiresAt;
+    const hasExplicitExpiration = Boolean(appProps.vidsetu_expires_at || fallbackLocal.expiresAt);
     const createdAt = parseInt(appProps.vidsetu_created_at || fallbackLocal.createdAt || new Date(file.createdTime || Date.now()).getTime(), 10);
     const expiresAt = hasExplicitExpiration
       ? parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt, 10)
@@ -290,13 +332,31 @@ export class DriveApiService {
       expiresAt,
       isExpired,
       thumbnailLink: file.thumbnailLink,
-      webContentLink: file.webContentLink,
-      webViewLink: file.webViewLink,
+      webContentLink: file.webContentLink || `https://drive.google.com/uc?export=download&id=${file.id}`,
+      webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
       driveFolderId: file.parents?.[0],
     };
 
     this.cacheVideoMetadata(meta);
     return meta;
+  }
+
+  /**
+   * Make a file accessible by anyone with the link (reader role)
+   */
+  public async makeFilePublic(fileId: string): Promise<void> {
+    try {
+      await this.fetchDrive(`/files/${fileId}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'anyone',
+        }),
+      });
+    } catch (err) {
+      console.warn('Could not set anyone-with-link public permission:', err);
+    }
   }
 
   /**
