@@ -39,21 +39,11 @@ export class ResumableUploader {
     if (this.file.size > MAX_FILE_SIZE_BYTES) {
       return {
         valid: false,
-        error: `Maximum video size is 6 GB. Your file is ${(this.file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
+        error: `Maximum file size is 6 GB. Your file is ${(this.file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
       };
     }
 
-    const acceptedTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo', 'video/avi', 'video/mkv'];
-    const hasValidType = acceptedTypes.some((t) => this.file.type.toLowerCase().includes(t.replace('video/', '')) || this.file.type === t) ||
-                         this.file.name.match(/\.(mp4|webm|mov|mkv|avi|m4v)$/i);
-
-    if (!hasValidType) {
-      return {
-        valid: false,
-        error: 'Unsupported file format. Please upload MP4, WebM, MOV, MKV, or AVI video files.',
-      };
-    }
-
+    // Allow ANY file type (APK, ZIP, video, documents, etc.)
     return { valid: true };
   }
 

@@ -236,7 +236,6 @@ export const VideoUploader: React.FC = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/avi,video/mkv,.mp4,.webm,.mov,.mkv,.avi,.m4v"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -246,10 +245,10 @@ export const VideoUploader: React.FC = () => {
               </div>
 
               <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                Drag and drop your video here
+                Drag and drop any file here
               </h3>
               <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
-                Or click to browse from desktop or select camera video on mobile devices.
+                Or click to browse from desktop or select files (APK, ZIP, videos, etc.) on mobile devices.
               </p>
 
               {/* Supported formats & limits */}
@@ -258,7 +257,7 @@ export const VideoUploader: React.FC = () => {
                   Max Size: 6 GB
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
-                  MP4, WebM, MOV, MKV, AVI
+                  APK, ZIP, MP4, MKV, Any Format
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
                   Folder: {uploadFolder?.name || 'VidSetu_Uploads'}
