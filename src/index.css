@@ -77,3 +77,50 @@
 .glow-cyan {
   box-shadow: 0 0 40px -10px rgba(56, 189, 248, 0.3);
 }
+
+/* Plyr Custom Theme */
+:root {
+  --plyr-color-main: #6366f1;
+  --plyr-video-background: #000000;
+  --plyr-video-controls-background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+  --plyr-control-radius: 12px;
+  --plyr-control-icon-size: 18px;
+  --plyr-range-thumb-height: 14px;
+  --plyr-range-thumb-width: 14px;
+  --plyr-tooltip-background: rgba(17, 24, 39, 0.95);
+  --plyr-tooltip-radius: 8px;
+  --plyr-menu-background: rgba(15, 23, 42, 0.95);
+  --plyr-menu-radius: 14px;
+  --plyr-font-family: inherit;
+}
+
+.plyr {
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (min-width: 640px) {
+  .plyr {
+    border-radius: 1.5rem;
+  }
+}
+
+.plyr--fullscreen-active,
+.plyr--fullscreen-fallback {
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.plyr__controls {
+  padding: 1rem !important;
+  gap: 0.5rem !important;
+}
+
+@media (max-width: 640px) {
+  .plyr__controls {
+    padding: 0.5rem !important;
+    gap: 0.25rem !important;
+  }
+}
