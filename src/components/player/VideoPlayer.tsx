@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { VideoMetadata, ZoomLevel } from '../../types';
 import { VideoControls } from './VideoControls';
 import { googleAuth } from '../../services/googleAuth';
-import { Loader2, Play } from 'lucide-react';
+import { Loader2, Play, Maximize, Minimize } from 'lucide-react';
 
 interface VideoPlayerProps {
   video: VideoMetadata;
@@ -475,6 +475,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 px-5 py-2.5 rounded-2xl bg-indigo-600/95 text-white text-xs sm:text-sm font-semibold backdrop-blur-md shadow-2xl border border-indigo-400/50 animate-fadeIn pointer-events-none flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
           <span>{resumedNotice}</span>
+        </div>
+      )}
+
+      {/* Floating Action Overlay for Iframe & Native Playback */}
+      {useIframeFallback && (
+        <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={handleToggleFullscreen}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-indigo-600 text-white text-xs font-semibold backdrop-blur-md border border-slate-700/80 shadow-2xl transition-all active:scale-95"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize className="w-4 h-4 text-indigo-400" />
+                <span className="hidden sm:inline">Exit Fullscreen</span>
+              </>
+            ) : (
+              <>
+                <Maximize className="w-4 h-4 text-indigo-400" />
+                <span>Fullscreen</span>
+              </>
+            )}
+          </button>
         </div>
       )}
 
