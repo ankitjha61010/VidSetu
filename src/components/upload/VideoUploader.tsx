@@ -1,0 +1,371 @@
+import React, { useState, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useDrive } from '../../context/DriveContext';
+import { useToast } from '../../context/ToastContext';
+import { ResumableUploader, MAX_FILE_SIZE_BYTES } from '../../services/resumableUpload';
+import { UploadProgress } from './UploadProgress';
+import { UploadProgressInfo, VideoMetadata } from '../../types';
+import { qrService } from '../../services/qrService';
+import { CopyLinkButton } from '../common/CopyLinkButton';
+import { QRModal } from '../common/QRModal';
+import {
+  UploadCloud,
+  FileVideo,
+  CheckCircle2,
+  Play,
+  QrCode,
+  ShieldAlert,
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+export const VideoUploader: React.FC = () => {
+  const { isAuthenticated, login } = useAuth();
+  const { activeFolder, uploadFolder, fetchVideos } = useDrive();
+  const { showToast } = useToast();
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [progressInfo, setProgressInfo] = useState<UploadProgressInfo | null>(null);
+  const [uploadedVideo, setUploadedVideo] = useState<VideoMetadata | null>(null);
+  const [uploaderInstance, setUploaderInstance] = useState<ResumableUploader | null>(null);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelection(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileSelection(e.target.files[0]);
+    }
+  };
+
+  const handleFileSelection = (file: File) => {
+    // Reset previous states
+    setUploadedVideo(null);
+    setProgressInfo(null);
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+      setVideoPreviewUrl(null);
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      showToast(
+        'File Too Large',
+        `Maximum video size is 6 GB. Selected file is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
+        'error',
+        6000
+      );
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for browser-compatible video types
+    try {
+      const url = URL.createObjectURL(file);
+      setVideoPreviewUrl(url);
+    } catch {
+      setVideoPreviewUrl(null);
+    }
+  };
+
+  const startUpload = async () => {
+    if (!selectedFile) return;
+
+    if (!isAuthenticated) {
+      showToast('Authentication Required', 'Please connect with Google to upload videos.', 'warning');
+      try {
+        await login();
+      } catch {
+        return;
+      }
+    }
+
+    const uploader = new ResumableUploader({
+      file: selectedFile,
+      folderId: uploadFolder?.id || activeFolder?.id,
+      onProgress: (info) => {
+        setProgressInfo(info);
+      },
+    });
+
+    setUploaderInstance(uploader);
+
+    try {
+      const result = await uploader.start();
+      setUploadedVideo(result);
+      showToast('Upload Successful!', `"${selectedFile.name}" is now ready to share.`, 'success', 5000);
+      fetchVideos(false);
+    } catch (err: any) {
+      if (err.message !== 'Upload was cancelled.') {
+        showToast('Upload Error', err.message || 'Failed to upload video to Google Drive.', 'error', 6000);
+      }
+    }
+  };
+
+  const handleCancelSelection = () => {
+    if (uploaderInstance) {
+      uploaderInstance.cancel();
+    }
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    setSelectedFile(null);
+    setVideoPreviewUrl(null);
+    setProgressInfo(null);
+    setUploaderInstance(null);
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
+  const watchUrl = uploadedVideo ? qrService.getWatchUrl(uploadedVideo.id) : '';
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Upload Success State Screen */}
+      {uploadedVideo ? (
+        <div className="glass-card p-8 rounded-3xl border border-emerald-500/30 text-center relative overflow-hidden animate-fadeIn shadow-2xl">
+          <div className="absolute top-0 right-0 -mt-12 -mr-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-6 text-emerald-400">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
+            UPLOAD SUCCESSFUL
+          </span>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
+            Your Video is Live & Sharable
+          </h2>
+          <p className="text-sm text-slate-300 max-w-lg mx-auto mb-6">
+            Uploaded to Google Drive folder{' '}
+            <strong className="text-white">{uploadFolder?.name || 'VidSetu_Uploads'}</strong>.
+            This watch link will remain active for <strong className="text-indigo-300">5 hours</strong>.
+          </p>
+
+          {/* Watch URL Box */}
+          <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 max-w-xl mx-auto mb-8 text-left">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-slate-400 font-medium">Watch URL:</span>
+              <span className="text-[11px] text-emerald-400 font-mono">5h Expiration Enabled</span>
+            </div>
+            <p className="text-xs sm:text-sm font-mono text-indigo-300 bg-black/40 p-3 rounded-xl border border-slate-800 break-all select-all">
+              {watchUrl}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <CopyLinkButton url={watchUrl} label="Copy Link" className="px-6 py-3" />
+
+            <button
+              onClick={() => setIsQRModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold border border-slate-700 hover:border-slate-600 transition-all text-sm"
+            >
+              <QrCode className="w-4 h-4 text-indigo-400" />
+              Generate QR
+            </button>
+
+            <Link
+              to={`/watch/${uploadedVideo.id}`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition-all text-sm"
+            >
+              <Play className="w-4 h-4" />
+              Watch Video
+            </Link>
+
+            <button
+              onClick={handleCancelSelection}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-sm transition-all"
+            >
+              Upload Another
+            </button>
+          </div>
+
+          {isQRModalOpen && (
+            <QRModal
+              isOpen={isQRModalOpen}
+              onClose={() => setIsQRModalOpen(false)}
+              videoId={uploadedVideo.id}
+              videoTitle={uploadedVideo.name}
+            />
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Main Upload / Dropzone Area */}
+          {!selectedFile ? (
+            <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`glass-panel p-10 sm:p-14 rounded-3xl border-2 border-dashed text-center cursor-pointer transition-all duration-300 relative overflow-hidden group ${
+                dragActive
+                  ? 'border-indigo-500 bg-indigo-500/10 scale-[1.01]'
+                  : 'border-slate-700 hover:border-indigo-500/60 hover:bg-slate-800/40'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/avi,video/mkv,.mp4,.webm,.mov,.mkv,.avi,.m4v"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              <div className="w-20 h-20 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-6 text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all duration-300">
+                <UploadCloud className="w-10 h-10" />
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                Drag and drop your video here
+              </h3>
+              <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
+                Or click to browse from desktop or select camera video on mobile devices.
+              </p>
+
+              {/* Supported formats & limits */}
+              <div className="inline-flex flex-wrap items-center justify-center gap-2 max-w-md mx-auto">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  Max Size: 6 GB
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
+                  MP4, WebM, MOV, MKV, AVI
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
+                  Folder: {uploadFolder?.name || 'VidSetu_Uploads'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Selected File Details & Preview */
+            <div className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+                {/* Video Preview or Icon */}
+                <div className="w-full md:w-56 h-36 bg-black rounded-2xl overflow-hidden border border-slate-800 relative flex items-center justify-center shrink-0">
+                  {videoPreviewUrl ? (
+                    <video
+                      src={videoPreviewUrl}
+                      className="w-full h-full object-contain"
+                      controls
+                      playsInline
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-slate-500 p-4 text-center">
+                      <FileVideo className="w-10 h-10 mb-2 text-indigo-400" />
+                      <span className="text-[11px]">Preview not supported for this codec</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* File Information */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      Ready to Upload (Max 6 GB)
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white truncate" title={selectedFile.name}>
+                    {selectedFile.name}
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                    <div>
+                      <span className="text-slate-400 block">File Size:</span>
+                      <span className="font-semibold text-slate-200">{formatFileSize(selectedFile.size)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">MIME Type:</span>
+                      <span className="font-semibold text-slate-200 truncate">{selectedFile.type || 'video/*'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Target Upload Folder:</span>
+                      <span className="font-semibold text-indigo-300 truncate">
+                        {uploadFolder?.name || 'VidSetu_Uploads'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Access Lifespan:</span>
+                      <span className="font-semibold text-emerald-400">5 Hours from completion</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress State while uploading */}
+              {progressInfo && (
+                <UploadProgress
+                  progressInfo={progressInfo}
+                  fileName={selectedFile.name}
+                  onPause={() => uploaderInstance?.pause()}
+                  onResume={() => uploaderInstance?.resume()}
+                  onCancel={handleCancelSelection}
+                />
+              )}
+
+              {/* Action Buttons when not in uploading loop */}
+              {(!progressInfo || progressInfo.status === 'failed' || progressInfo.status === 'cancelled') && (
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                  <button
+                    onClick={handleCancelSelection}
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={startUpload}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all text-sm"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Start Chunked Upload</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Info notice about 5 hour expiration and frontend-only architecture */}
+      <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-slate-300 flex items-start gap-3">
+        <ShieldAlert className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-semibold text-indigo-200">
+            Privacy & 5-Hour Expiration Architecture
+          </p>
+          <p className="text-slate-400 leading-relaxed">
+            VidSetu uploads directly from your browser to your personal Google Drive in chunks without going through a custom backend. Videos automatically expire after 5 hours and will be automatically purged by the app during active sessions.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
