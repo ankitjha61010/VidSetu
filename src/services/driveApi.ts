@@ -154,8 +154,13 @@ export class DriveApiService {
   public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
     // 1. Search for all folders named VidSetu_Videos OR VidSetu_Uploads
     const folderQ = `(name = 'VidSetu_Videos' or name = 'VidSetu_Uploads') and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const folderRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`);
-    const folderData = await folderRes.json();
+    let folderData: any = { files: [] };
+    try {
+      const folderRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`);
+      folderData = await folderRes.json();
+    } catch (e) {
+      console.warn('Folder discovery error:', e);
+    }
 
     let targetFolderIds: string[] = [];
     if (folderId) {
@@ -169,14 +174,13 @@ export class DriveApiService {
       });
     }
 
-    if (targetFolderIds.length === 0) {
-      const defaultFolder = await this.getOrCreateVideosFolder();
-      targetFolderIds.push(defaultFolder.id);
+    let q = '';
+    if (targetFolderIds.length > 0) {
+      const parentQueries = targetFolderIds.map((id) => `'${id}' in parents`).join(' or ');
+      q = `trashed = false and (${parentQueries})`;
+    } else {
+      q = `trashed = false and (mimeType contains 'video/' or name contains '.mp4' or name contains '.mkv')`;
     }
-
-    // Build query checking all VidSetu folder IDs (e.g. 'id1' in parents or 'id2' in parents)
-    const parentQueries = targetFolderIds.map((id) => `'${id}' in parents`).join(' or ');
-    let q = `trashed = false and (${parentQueries})`;
 
     let url = `/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
     if (pageToken) {
@@ -185,6 +189,21 @@ export class DriveApiService {
 
     let res = await this.fetchDrive(url);
     let data = await res.json();
+
+    // If folder query returned 0 videos, do an expanded search for any video file in Drive
+    if ((!data.files || data.files.length === 0) && !pageToken) {
+      const fallbackQ = `trashed = false and (mimeType contains 'video/' or name contains '.mp4' or name contains '.mkv' or name contains '.mov' or name contains '.avi')`;
+      const fallbackUrl = `/files?q=${encodeURIComponent(fallbackQ)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
+      try {
+        const fallbackRes = await this.fetchDrive(fallbackUrl);
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData.files && fallbackData.files.length > 0) {
+          data = fallbackData;
+        }
+      } catch (e) {
+        console.warn('Fallback search error:', e);
+      }
+    }
 
     const localCache = this.getLocalMetadataCache();
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { DriveProvider } from './context/DriveContext';
 import { ToastProvider } from './context/ToastContext';
@@ -39,16 +39,16 @@ export const App: React.FC = () => {
                 </Routes>
               </main>
 
-              {/* Footer */}
-              <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500 hidden md:block">
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-slate-400">
+              {/* Footer with Privacy Policy and Terms Links */}
+              <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-slate-400">
                   <p>
                     VidSetu • Frontend-Only Video Sharing & Watching Platform
                   </p>
                   <div className="flex items-center gap-3 text-slate-400">
-                    <a href="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</a>
+                    <Link to="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</Link>
                     <span>•</span>
-                    <a href="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</a>
+                    <Link to="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</Link>
                   </div>
                 </div>
               </footer>
