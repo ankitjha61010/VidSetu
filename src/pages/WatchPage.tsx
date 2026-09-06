@@ -8,7 +8,6 @@ import { VideoPlayer } from '../components/player/VideoPlayer';
 import { ExpiredVideo } from '../components/player/ExpiredVideo';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
-import { ExpirationTimer } from '../components/common/ExpirationTimer';
 import { CopyLinkButton } from '../components/common/CopyLinkButton';
 import { QRModal } from '../components/common/QRModal';
 import { VideoMetadata } from '../types';
@@ -17,7 +16,6 @@ import {
   HardDrive,
   QrCode,
   ArrowLeft,
-  ShieldCheck,
   Download,
   FileCode,
   FileArchive,
@@ -225,14 +223,6 @@ export const WatchPage: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Library</span>
         </Link>
-
-        {/* Only show countdown timer if file actually has a temporary expiration (3 days) */}
-        {video.expiresAt && video.expiresAt < video.createdAt + 10 * 24 * 60 * 60 * 1000 && (
-          <ExpirationTimer
-            expiresAt={video.expiresAt}
-            onExpire={() => setIsExpired(true)}
-          />
-        )}
       </div>
 
       {/* Media or Universal File Download Container */}
@@ -259,7 +249,7 @@ export const WatchPage: React.FC = () => {
             <span>•</span>
             <span className="font-mono text-indigo-300">{video.mimeType || 'Application/File'}</span>
             <span>•</span>
-            <span className="text-emerald-400 font-semibold">Active for 3 Days</span>
+            <span className="text-emerald-400 font-semibold">Secure Direct Transfer</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -330,18 +320,6 @@ export const WatchPage: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* Expiration Notice Bar - only for temporary uploads (3 days) */}
-        {video.expiresAt && video.expiresAt < video.createdAt + 10 * 24 * 60 * 60 * 1000 && (
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-xs">
-            <div className="flex items-center gap-2.5 text-indigo-300">
-              <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>
-                This link and file are active for <strong>3 days (72 hours)</strong> from upload time. After expiration, the file is automatically and permanently deleted from cloud storage.
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
       {showQRModal && (
