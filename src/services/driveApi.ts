@@ -149,18 +149,34 @@ export class DriveApiService {
   }
 
   /**
-   * List videos stored in the target folder with support for manual uploads & movies
+   * List videos stored in the VidSetu_Videos folder with support for manual uploads & movies
    */
   public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
-    const videosFolder = await this.getOrCreateVideosFolder();
-    const targetFolderId = folderId || videosFolder?.id;
+    // 1. Search for all folders named VidSetu_Videos
+    const folderQ = `name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const folderRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`);
+    const folderData = await folderRes.json();
 
-    if (!targetFolderId) {
-      return { videos: [] };
+    let targetFolderIds: string[] = [];
+    if (folderId) {
+      targetFolderIds.push(folderId);
+    }
+    if (folderData.files && folderData.files.length > 0) {
+      folderData.files.forEach((f: any) => {
+        if (!targetFolderIds.includes(f.id)) {
+          targetFolderIds.push(f.id);
+        }
+      });
     }
 
-    // Strictly search ONLY files inside the VidSetu_Videos folder
-    let q = `trashed = false and '${targetFolderId}' in parents`;
+    if (targetFolderIds.length === 0) {
+      const defaultFolder = await this.getOrCreateVideosFolder();
+      targetFolderIds.push(defaultFolder.id);
+    }
+
+    // Build query checking all VidSetu_Videos folder IDs (e.g. 'id1' in parents or 'id2' in parents)
+    const parentQueries = targetFolderIds.map((id) => `'${id}' in parents`).join(' or ');
+    let q = `trashed = false and (${parentQueries})`;
 
     let url = `/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
     if (pageToken) {
@@ -208,7 +224,7 @@ export class DriveApiService {
         thumbnailLink: file.thumbnailLink,
         webContentLink: file.webContentLink,
         webViewLink: file.webViewLink,
-        driveFolderId: targetFolderId,
+        driveFolderId: file.parents?.[0] || targetFolderIds[0],
       };
 
       // Keep cache updated
