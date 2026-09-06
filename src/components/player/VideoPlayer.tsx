@@ -289,7 +289,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
               onEnded={() => {
                 setIsPlaying(false);
                 setShowControls(true);
-                localStorage.removeItem(STORAGE_PLAYBACK_KEY);
+              }}
+              onPlay={() => {
+                applyResumeTime();
               }}
               onClick={handlePlayPause}
             />

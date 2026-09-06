@@ -98,7 +98,7 @@ export const WatchPage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* Top back & expiration navigation */}
+      {/* Top back navigation */}
       <div className="flex items-center justify-between gap-4">
         <Link
           to="/videos"
@@ -108,10 +108,13 @@ export const WatchPage: React.FC = () => {
           <span>Back to Library</span>
         </Link>
 
-        <ExpirationTimer
-          expiresAt={video.expiresAt}
-          onExpire={() => setIsExpired(true)}
-        />
+        {/* Only show 5-hour countdown timer if video actually has a temporary expiration */}
+        {video.expiresAt && video.expiresAt < video.createdAt + 24 * 60 * 60 * 1000 && (
+          <ExpirationTimer
+            expiresAt={video.expiresAt}
+            onExpire={() => setIsExpired(true)}
+          />
+        )}
       </div>
 
       {/* Main Video Player Container */}
@@ -155,15 +158,17 @@ export const WatchPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Expiration Notice Bar */}
-        <div className="flex items-center justify-between p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-xs">
-          <div className="flex items-center gap-2.5 text-indigo-300">
-            <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span>
-              This video is strictly accessible for <strong>5 hours</strong> from upload time. After expiration, links and player playback automatically lock.
-            </span>
+        {/* Expiration Notice Bar - only for temporary uploads */}
+        {video.expiresAt && video.expiresAt < video.createdAt + 24 * 60 * 60 * 1000 && (
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-xs">
+            <div className="flex items-center gap-2.5 text-indigo-300">
+              <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span>
+                This video is accessible for <strong>5 hours</strong> from upload time. After expiration, links and player playback automatically lock.
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {showQRModal && (
