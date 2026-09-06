@@ -143,13 +143,10 @@ export class DriveApiService {
    * List videos stored in the target folder with support for manual uploads & movies
    */
   public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
-    // If no folderId supplied, retrieve or search the VidSetu_Videos folder
-    let targetFolderId = folderId;
-    if (!targetFolderId) {
-      const folder = await this.getOrCreateVideosFolder();
-      targetFolderId = folder.id;
-    }
+    const videosFolder = await this.getOrCreateVideosFolder();
+    const targetFolderId = folderId || videosFolder?.id;
 
+    // Search query for videos in target folder, or with parent matching target folder
     let q = `trashed = false and '${targetFolderId}' in parents`;
 
     let url = `/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
@@ -157,8 +154,26 @@ export class DriveApiService {
       url += `&pageToken=${encodeURIComponent(pageToken)}`;
     }
 
-    const res = await this.fetchDrive(url);
-    const data = await res.json();
+    let res = await this.fetchDrive(url);
+    let data = await res.json();
+
+    // Fallback: If target folder returns 0 files, also check if user named a folder VidSetu_Videos or search across drive
+    if ((!data.files || data.files.length === 0) && !pageToken) {
+      const broadQ = `trashed = false and name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder'`;
+      const searchRes = await this.fetchDrive(`/files?q=${encodeURIComponent(broadQ)}&fields=files(id,name)`);
+      const searchData = await searchRes.json();
+      
+      if (searchData.files && searchData.files.length > 0) {
+        const foundFolderId = searchData.files[0].id;
+        if (foundFolderId !== targetFolderId) {
+          const folder: DriveFolder = { id: foundFolderId, name: 'VidSetu_Videos' };
+          this.saveActiveFolder(folder);
+          const fallbackRes = await this.fetchDrive(`/files?q=${encodeURIComponent(`trashed = false and '${foundFolderId}' in parents`)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
+          data = await fallbackRes.json();
+        }
+      }
+    }
+
     const localCache = this.getLocalMetadataCache();
 
     // Filter to video files (MIME type video/*, video extensions, or generic binary video files)
