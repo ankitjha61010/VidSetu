@@ -85,7 +85,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             <p>
               If you have questions regarding this Privacy Policy or wish to revoke access, you may disconnect your Google Account at any time via the application header or by emailing developer support at{' '}
               <a href="mailto:abhishek61010@gmail.com" className="text-indigo-400 hover:underline font-semibold">
-                abhishek61010@gmail.com
+                abhikashyap2698@gmail.com
               </a>.
             </p>
           </section>

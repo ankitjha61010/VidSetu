@@ -58,8 +58,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
   return (
     <div
       className={`glass-panel rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col group ${isExpired
-          ? 'border-rose-950/40 bg-slate-950/40 opacity-75'
-          : 'border-slate-800 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/5'
+        ? 'border-rose-950/40 bg-slate-950/40 opacity-75'
+        : 'border-slate-800 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/5'
         }`}
     >
       {/* Thumbnail or Video Cover */}

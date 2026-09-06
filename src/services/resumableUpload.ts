@@ -4,7 +4,7 @@ import { UploadProgressInfo, VideoMetadata, UploadStatus } from '../types';
 
 export const MAX_FILE_SIZE_BYTES = 6 * 1024 * 1024 * 1024; // 6 GB exactly
 export const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB chunk size for high performance large file upload
-export const EXPIRATION_DURATION_MS = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+export const EXPIRATION_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days (72 hours) in milliseconds
 
 export interface ResumableUploadOptions {
   file: File;

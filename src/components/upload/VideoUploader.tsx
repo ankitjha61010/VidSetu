@@ -162,14 +162,14 @@ export const VideoUploader: React.FC = () => {
             File Uploaded Successfully
           </h2>
           <p className="text-sm text-slate-300 max-w-lg mx-auto mb-6">
-            Your file is ready to share. This download and transfer link will remain active for <strong className="text-indigo-300">5 hours</strong>.
+            Your file is ready to share. This download and transfer link will remain active for <strong className="text-indigo-300">3 days</strong> (automatically deleted after expiration).
           </p>
 
           {/* Share URL Box */}
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 max-w-xl mx-auto mb-8 text-left">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-slate-400 font-medium">Share Link:</span>
-              <span className="text-[11px] text-emerald-400 font-mono">5h Expiration Enabled</span>
+              <span className="text-[11px] text-emerald-400 font-mono">3 Days Expiration</span>
             </div>
             <p className="text-xs sm:text-sm font-mono text-indigo-300 bg-black/40 p-3 rounded-xl border border-slate-800 break-all select-all">
               {watchUrl}
@@ -301,7 +301,7 @@ export const VideoUploader: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-slate-400 block">Access Lifespan:</span>
-                      <span className="font-semibold text-emerald-400">5 Hours from completion</span>
+                      <span className="font-semibold text-emerald-400">3 Days (Auto-deleted)</span>
                     </div>
                   </div>
                 </div>
@@ -341,15 +341,15 @@ export const VideoUploader: React.FC = () => {
         </>
       )}
 
-      {/* Info notice about 5 hour expiration and frontend-only architecture */}
+      {/* Info notice about 3 day expiration and frontend-only architecture */}
       <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-slate-300 flex items-start gap-3">
         <ShieldAlert className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-semibold text-indigo-200">
-            Privacy & 5-Hour Expiration Architecture
+            Privacy & 3-Day Auto-Deletion Architecture
           </p>
           <p className="text-slate-400 leading-relaxed">
-            VidSetu transfers files directly from your browser with chunked upload acceleration without third-party servers. Uploaded files automatically expire and clean up 5 hours after creation.
+            VidSetu transfers files directly from your browser with chunked upload acceleration without third-party servers. Uploaded files automatically expire after 3 days and are permanently deleted from cloud storage.
           </p>
         </div>
       </div>

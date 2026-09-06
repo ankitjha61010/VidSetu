@@ -2,9 +2,10 @@ import { driveApi } from './driveApi';
 import { googleAuth } from './googleAuth';
 import { VideoMetadata } from '../types';
 
-export const EXPIRATION_HOURS = 5;
+export const EXPIRATION_HOURS = 72; // 3 Days (72 hours)
 
 export interface ExpirationTimeRemaining {
+  days: number;
   hours: number;
   minutes: number;
   seconds: number;
@@ -15,7 +16,7 @@ export interface ExpirationTimeRemaining {
 
 export class ExpirationService {
   /**
-   * Calculate precise time remaining until 5-hour expiration
+   * Calculate precise time remaining until 3-day expiration
    */
   public getTimeRemaining(expiresAt: number): ExpirationTimeRemaining {
     const now = Date.now();
@@ -23,6 +24,7 @@ export class ExpirationService {
 
     if (diffMs <= 0) {
       return {
+        days: 0,
         hours: 0,
         minutes: 0,
         seconds: 0,
@@ -33,14 +35,16 @@ export class ExpirationService {
     }
 
     const totalSeconds = Math.floor(diffMs / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
 
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const formatted = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    const formatted = days > 0 ? `${days}d ${pad(hours)}h ${pad(minutes)}m` : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 
     return {
+      days,
       hours,
       minutes,
       seconds,
@@ -51,7 +55,7 @@ export class ExpirationService {
   }
 
   /**
-   * Run background cleanup for expired videos when user is active with Google auth
+   * Run background cleanup for expired files when user is active with Google auth
    */
   public async purgeExpiredVideos(videos?: VideoMetadata[]): Promise<{ purgedCount: number }> {
     if (!googleAuth.isAuthenticated()) {
@@ -61,15 +65,17 @@ export class ExpirationService {
     try {
       const listToCheck = videos || (await driveApi.listVideos()).videos;
       const now = Date.now();
-      const expired = listToCheck.filter((v) => v.expiresAt && now > v.expiresAt);
+      // Only purge files with explicit temporary expiration that have passed their 3-day window
+      const expired = listToCheck.filter((v) => v.expiresAt && v.expiresAt < v.createdAt + 10 * 24 * 60 * 60 * 1000 && now > v.expiresAt);
 
       let purgedCount = 0;
       for (const vid of expired) {
         try {
-          await driveApi.deleteVideo(vid.driveFileId, false); // move to trash safely
+          // Permanently delete file from Google Drive after 3 days
+          await driveApi.deleteVideo(vid.driveFileId, true);
           purgedCount++;
         } catch (e) {
-          console.warn(`Could not purge expired video ${vid.name}:`, e);
+          console.warn(`Could not purge expired file ${vid.name}:`, e);
         }
       }
 
