@@ -213,9 +213,9 @@ export const WatchPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Top back navigation */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 px-1">
         <Link
           to="/videos"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
@@ -231,7 +231,7 @@ export const WatchPage: React.FC = () => {
           <VideoPlayer video={video} />
         </div>
       ) : (
-        <div className="glass-card p-10 sm:p-14 rounded-3xl border border-slate-800 text-center relative overflow-hidden shadow-2xl">
+        <div className="glass-card p-6 sm:p-10 md:p-14 rounded-2xl sm:rounded-3xl border border-slate-800 text-center relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="flex justify-center mb-6">{renderFileIcon()}</div>
@@ -240,11 +240,11 @@ export const WatchPage: React.FC = () => {
             FILE READY FOR DOWNLOAD
           </span>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 max-w-xl mx-auto break-all">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white mb-2 max-w-xl mx-auto break-all">
             {video.originalFileName || video.name}
           </h2>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-slate-400 mb-8">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-400 mb-8">
             <span className="font-semibold text-slate-200">{formatFileSize(video.size)}</span>
             <span>•</span>
             <span className="font-mono text-indigo-300">{video.mimeType || 'Application/File'}</span>
@@ -256,7 +256,7 @@ export const WatchPage: React.FC = () => {
             <button
               onClick={handleDownloadFile}
               disabled={isDownloading}
-              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-base shadow-xl shadow-indigo-600/40 hover:shadow-indigo-500/60 hover:scale-[1.02] transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm sm:text-base shadow-xl shadow-indigo-600/40 hover:shadow-indigo-500/60 hover:scale-[1.02] transition-all disabled:opacity-50"
             >
               {isDownloading ? (
                 <>
@@ -275,16 +275,16 @@ export const WatchPage: React.FC = () => {
       )}
 
       {/* Video / File Details & Interaction Panel */}
-      <div className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+      <div className="glass-card p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-4 sm:space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 sm:pb-6 border-b border-slate-800">
           <div className="min-w-0 space-y-1">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white truncate" title={video.originalFileName || video.name}>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-white truncate" title={video.originalFileName || video.name}>
               {video.originalFileName || video.name}
             </h1>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                Uploaded {new Date(video.createdAt).toLocaleString()}
+                Uploaded {new Date(video.createdAt).toLocaleDateString()}
               </span>
               <span className="flex items-center gap-1">
                 <HardDrive className="w-3.5 h-3.5 text-slate-500" />
@@ -297,12 +297,12 @@ export const WatchPage: React.FC = () => {
           </div>
 
           {/* Quick Sharing Toolbar */}
-          <div className="flex items-center gap-2 self-start lg:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
             {isVideoFile && (
               <button
                 onClick={handleDownloadFile}
                 disabled={isDownloading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all"
+                className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all"
               >
                 <Download className="w-4 h-4" />
                 <span>Download</span>
@@ -313,7 +313,7 @@ export const WatchPage: React.FC = () => {
 
             <button
               onClick={() => setShowQRModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition-colors"
             >
               <QrCode className="w-4 h-4 text-indigo-400" />
               <span>QR Code</span>

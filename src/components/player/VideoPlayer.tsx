@@ -182,12 +182,84 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     }
   };
 
+  const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState<{ side: 'left' | 'right'; show: boolean }>({ side: 'left', show: false });
+  const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleToggleFullscreen = () => {
-    if (!playerContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch(() => {});
+    const container = playerContainerRef.current;
+    const videoEl = videoRef.current as any;
+    if (!container) return;
+
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement ||
+      isPseudoFullscreen
+    );
+
+    if (!isCurrentlyFullscreen) {
+      // 1. Try standard / container fullscreen
+      if (container.requestFullscreen) {
+        container.requestFullscreen().then(() => {
+          setIsFullscreen(true);
+        }).catch(() => {
+          // iOS Safari fallback
+          if (videoEl?.webkitEnterFullscreen) {
+            videoEl.webkitEnterFullscreen();
+            setIsFullscreen(true);
+          } else {
+            setIsPseudoFullscreen(true);
+            setIsFullscreen(true);
+          }
+        });
+      } else if ((container as any).webkitRequestFullscreen) {
+        (container as any).webkitRequestFullscreen();
+        setIsFullscreen(true);
+      } else if ((container as any).mozRequestFullScreen) {
+        (container as any).mozRequestFullScreen();
+        setIsFullscreen(true);
+      } else if ((container as any).msRequestFullscreen) {
+        (container as any).msRequestFullscreen();
+        setIsFullscreen(true);
+      } else if (videoEl?.webkitEnterFullscreen) {
+        // iOS Safari native fullscreen
+        videoEl.webkitEnterFullscreen();
+        setIsFullscreen(true);
+      } else {
+        // Pseudo Fullscreen fallback for mobile browsers
+        setIsPseudoFullscreen(true);
+        setIsFullscreen(true);
+      }
+
+      // Try orientation lock on mobile
+      try {
+        if ((window.screen as any)?.orientation?.lock) {
+          (window.screen as any).orientation.lock('landscape').catch(() => {});
+        }
+      } catch {}
     } else {
-      document.exitFullscreen().catch(() => {});
+      if (isPseudoFullscreen) {
+        setIsPseudoFullscreen(false);
+        setIsFullscreen(false);
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+      setIsFullscreen(false);
+
+      try {
+        if ((window.screen as any)?.orientation?.unlock) {
+          (window.screen as any).orientation.unlock();
+        }
+      } catch {}
     }
   };
 
@@ -208,7 +280,46 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     if (!videoRef.current) return;
     const newTime = Math.max(0, Math.min(videoRef.current.currentTime + seconds, duration));
     videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
     localStorage.setItem(STORAGE_PLAYBACK_KEY, newTime.toString());
+  };
+
+  // Mobile Touch / Double Tap handling
+  const handleVideoTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    const touch = e.changedTouches[0];
+    if (!touch || !playerContainerRef.current) return;
+
+    const rect = playerContainerRef.current.getBoundingClientRect();
+    const tapX = touch.clientX - rect.left;
+    const width = rect.width;
+
+    const timeDiff = now - lastTapRef.current.time;
+    const isDoubleTap = timeDiff < 300 && Math.abs(touch.clientX - lastTapRef.current.x) < 50;
+
+    if (isDoubleTap) {
+      // Double tap detected: Left 40% = -10s, Right 40% = +10s
+      if (tapX < width * 0.4) {
+        handleSkip(-10);
+        showDoubleTapFeedback('left');
+      } else if (tapX > width * 0.6) {
+        handleSkip(10);
+        showDoubleTapFeedback('right');
+      }
+      lastTapRef.current = { time: 0, x: 0 };
+    } else {
+      lastTapRef.current = { time: now, x: touch.clientX };
+      // Toggle controls on single tap
+      setShowControls((prev) => !prev);
+    }
+  };
+
+  const showDoubleTapFeedback = (side: 'left' | 'right') => {
+    setDoubleTapFeedback({ side, show: true });
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setDoubleTapFeedback({ side: 'left', show: false });
+    }, 700);
   };
 
   // Keyboard navigation
@@ -253,19 +364,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayPause, volume, isMuted, duration]);
 
+  // Fullscreen event listener (cross-browser and iOS)
   useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const handleFullscreenChange = () => {
+      const isFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement ||
+        isPseudoFullscreen
+      );
+      setIsFullscreen(isFs);
+    };
+
+    const videoEl = videoRef.current;
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    if (videoEl) {
+      videoEl.addEventListener('webkitbeginfullscreen', () => setIsFullscreen(true));
+      videoEl.addEventListener('webkitendfullscreen', () => setIsFullscreen(false));
+    }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, [isPseudoFullscreen]);
 
   return (
     <div
       ref={playerContainerRef}
       onMouseMove={handleMouseMove}
-      onTouchStart={handleMouseMove}
-      className={`relative w-full aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 select-none group ${
-        isFullscreen ? 'rounded-none border-none' : ''
+      onTouchEnd={handleVideoTouch}
+      className={`relative w-full aspect-video bg-black overflow-hidden shadow-2xl select-none group touch-manipulation ${
+        isPseudoFullscreen
+          ? 'fixed inset-0 z-50 w-screen h-screen rounded-none border-none max-h-screen'
+          : isFullscreen
+          ? 'w-full h-full rounded-none border-none'
+          : 'rounded-2xl sm:rounded-3xl border border-slate-800'
       }`}
     >
       <div className="w-full h-full flex items-center justify-center overflow-hidden">
@@ -283,6 +424,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
               ref={videoRef}
               src={mediaSrc}
               playsInline
+              webkit-playsinline="true"
+              x5-playsinline="true"
               preload="metadata"
               className="w-full h-full object-contain transition-transform duration-200"
               style={{
@@ -309,11 +452,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
               onPlay={() => {
                 applyResumeTime();
               }}
-              onClick={handlePlayPause}
             />
           )
         )}
       </div>
+
+      {/* Double Tap Ripple Indicator */}
+      {doubleTapFeedback.show && (
+        <div
+          className={`absolute top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-40 bg-white/10 animate-pulse ${
+            doubleTapFeedback.side === 'left' ? 'left-0 rounded-r-full' : 'right-0 rounded-l-full'
+          }`}
+        >
+          <div className="flex flex-col items-center gap-1 text-white font-bold text-sm bg-black/60 px-4 py-2 rounded-2xl backdrop-blur-md">
+            <span>{doubleTapFeedback.side === 'left' ? '⏪ -10s' : '⏩ +10s'}</span>
+          </div>
+        </div>
+      )}
 
       {/* Auto-Resume Notification */}
       {resumedNotice && (
