@@ -15,7 +15,7 @@ export const VideosPage: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-white">Sign In to Access Movies Library</h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-2 leading-relaxed">
-            Connect your Google account to browse, stream, and watch movies stored directly in your Google Drive 'VidSetu_Videos' folder.
+            Connect your Google account to browse, stream, and watch movies stored in your library.
           </p>
         </div>
         <button
@@ -37,7 +37,7 @@ export const VideosPage: React.FC = () => {
             Movies & Videos Library
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Displaying all movie and video files stored inside your Google Drive <strong className="text-indigo-300">VidSetu_Videos</strong> folder
+            Displaying all movie and video files stored inside your <strong className="text-indigo-300">VidSetu_Videos</strong> folder
           </p>
         </div>
       </div>

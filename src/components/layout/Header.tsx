@@ -24,12 +24,9 @@ export const Header: React.FC = () => {
           <div className="flex flex-col">
             <span className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
               VidSetu
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Drive
-              </span>
             </span>
             <span className="text-[10px] text-slate-400 font-medium -mt-1 hidden sm:block">
-              Privacy-First Video Sharing
+              Fast & Private File Sharing
             </span>
           </div>
         </Link>

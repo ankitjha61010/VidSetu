@@ -12,11 +12,9 @@ import {
   UploadCloud,
   FileVideo,
   CheckCircle2,
-  Play,
   QrCode,
   ShieldAlert,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export const VideoUploader: React.FC = () => {
   const { isAuthenticated, login } = useAuth();
@@ -161,18 +159,16 @@ export const VideoUploader: React.FC = () => {
           </span>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
-            Your Video is Live & Sharable
+            File Uploaded Successfully
           </h2>
           <p className="text-sm text-slate-300 max-w-lg mx-auto mb-6">
-            Uploaded to Google Drive folder{' '}
-            <strong className="text-white">{uploadFolder?.name || 'VidSetu_Uploads'}</strong>.
-            This watch link will remain active for <strong className="text-indigo-300">5 hours</strong>.
+            Your file is ready to share. This download and transfer link will remain active for <strong className="text-indigo-300">5 hours</strong>.
           </p>
 
-          {/* Watch URL Box */}
+          {/* Share URL Box */}
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 max-w-xl mx-auto mb-8 text-left">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-slate-400 font-medium">Watch URL:</span>
+              <span className="text-xs text-slate-400 font-medium">Share Link:</span>
               <span className="text-[11px] text-emerald-400 font-mono">5h Expiration Enabled</span>
             </div>
             <p className="text-xs sm:text-sm font-mono text-indigo-300 bg-black/40 p-3 rounded-xl border border-slate-800 break-all select-all">
@@ -182,7 +178,7 @@ export const VideoUploader: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <CopyLinkButton url={watchUrl} label="Copy Link" className="px-6 py-3" />
+            <CopyLinkButton url={watchUrl} label="Copy Share Link" className="px-6 py-3" />
 
             <button
               onClick={() => setIsQRModalOpen(true)}
@@ -192,19 +188,11 @@ export const VideoUploader: React.FC = () => {
               Generate QR
             </button>
 
-            <Link
-              to={`/watch/${uploadedVideo.id}`}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition-all text-sm"
-            >
-              <Play className="w-4 h-4" />
-              Watch Video
-            </Link>
-
             <button
               onClick={handleCancelSelection}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-sm transition-all"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 transition-all text-sm"
             >
-              Upload Another
+              Upload Another File
             </button>
           </div>
 
@@ -361,7 +349,7 @@ export const VideoUploader: React.FC = () => {
             Privacy & 5-Hour Expiration Architecture
           </p>
           <p className="text-slate-400 leading-relaxed">
-            VidSetu uploads directly from your browser to your personal Google Drive in chunks without going through a custom backend. Videos automatically expire after 5 hours and will be automatically purged by the app during active sessions.
+            VidSetu transfers files directly from your browser with chunked upload acceleration without third-party servers. Uploaded files automatically expire and clean up 5 hours after creation.
           </p>
         </div>
       </div>

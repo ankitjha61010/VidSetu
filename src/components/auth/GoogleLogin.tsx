@@ -72,7 +72,7 @@ export const GoogleLogin: React.FC = () => {
           </p>
           <div className="flex items-center gap-1 text-[10px] text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            Drive Connected
+            Connected
           </div>
         </div>
         <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
@@ -90,7 +90,7 @@ export const GoogleLogin: React.FC = () => {
               <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-1 rounded-lg">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Drive Connected
+                Account Connected
               </div>
             </div>
 
