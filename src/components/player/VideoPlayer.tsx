@@ -21,10 +21,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoom, setZoom] = useState<ZoomLevel>(1);
   const [showControls, setShowControls] = useState(true);
-  const [isBuffering, setIsBuffering] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [mediaSrc, setMediaSrc] = useState<string>('');
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
+  const [useDrivePreview, setUseDrivePreview] = useState(true);
 
   const STORAGE_PLAYBACK_KEY = `vidsetu_playback_${video.id}`;
 
@@ -36,8 +37,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
       try {
         const token = await googleAuth.getValidAccessToken();
         if (active) {
-          // Point directly to Google Drive stream endpoint with auth token query / header fallback
-          // or direct webContentLink for instant buffer playback
           const streamUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
           setMediaSrc(streamUrl);
         }
@@ -238,34 +237,74 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         isFullscreen ? 'rounded-none border-none' : ''
       }`}
     >
-      {/* Video element with transform zoom centering */}
+      {/* Video player view */}
       <div className="w-full h-full flex items-center justify-center overflow-hidden">
-        {mediaSrc && (
-          <video
-            ref={videoRef}
-            src={mediaSrc}
-            playsInline
-            className="w-full h-full object-contain transition-transform duration-200"
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: 'center center',
-            }}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onWaiting={() => setIsBuffering(true)}
-            onPlaying={() => {
-              setIsBuffering(false);
-              setIsPlaying(true);
-            }}
-            onPause={() => setIsPlaying(false)}
-            onEnded={() => {
-              setIsPlaying(false);
-              setShowControls(true);
-              localStorage.removeItem(STORAGE_PLAYBACK_KEY);
-            }}
-            onClick={handlePlayPause}
+        {useDrivePreview ? (
+          <iframe
+            src={`https://drive.google.com/file/d/${video.driveFileId}/preview`}
+            className="w-full h-full border-none"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            title={video.name}
           />
+        ) : (
+          mediaSrc && (
+            <video
+              ref={videoRef}
+              src={mediaSrc}
+              playsInline
+              className="w-full h-full object-contain transition-transform duration-200"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: 'center center',
+              }}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onWaiting={() => setIsBuffering(true)}
+              onPlaying={() => {
+                setIsBuffering(false);
+                setIsPlaying(true);
+              }}
+              onPause={() => setIsPlaying(false)}
+              onError={() => {
+                console.warn('Native video error, switching to Google Drive high-speed stream preview');
+                setUseDrivePreview(true);
+              }}
+              onEnded={() => {
+                setIsPlaying(false);
+                setShowControls(true);
+                localStorage.removeItem(STORAGE_PLAYBACK_KEY);
+              }}
+              onClick={handlePlayPause}
+            />
+          )
         )}
+      </div>
+
+      {/* Mode Switcher Toggle Pill */}
+      <div className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 text-xs">
+        <button
+          type="button"
+          onClick={() => setUseDrivePreview(true)}
+          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+            useDrivePreview
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Cloud Stream
+        </button>
+        <button
+          type="button"
+          onClick={() => setUseDrivePreview(false)}
+          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+            !useDrivePreview
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Native Player
+        </button>
       </div>
 
       {/* Resume notification banner */}
@@ -276,49 +315,53 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         </div>
       )}
 
-      {/* Buffering Indicator */}
-      {isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none backdrop-blur-xs">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
-            <span className="text-xs font-semibold text-white/90">Loading Stream...</span>
-          </div>
-        </div>
-      )}
+      {/* Native Player Controls - only active when in Native Player mode */}
+      {!useDrivePreview && (
+        <>
+          {/* Buffering Indicator */}
+          {isBuffering && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none backdrop-blur-xs">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+                <span className="text-xs font-semibold text-white/90">Loading Stream...</span>
+              </div>
+            </div>
+          )}
 
-      {/* Prominent Play Button if browser blocked autoplay */}
-      {autoplayBlocked && !isPlaying && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
-          <button
-            onClick={handlePlayPause}
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg shadow-2xl shadow-indigo-600/50 transform hover:scale-105 transition-all"
-          >
-            <Play className="w-6 h-6 fill-current" />
-            <span>Click to Play Video</span>
-          </button>
-        </div>
-      )}
+          {/* Prominent Play Button if browser blocked autoplay */}
+          {autoplayBlocked && !isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
+              <button
+                onClick={handlePlayPause}
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg shadow-2xl shadow-indigo-600/50 transform hover:scale-105 transition-all"
+              >
+                <Play className="w-6 h-6 fill-current" />
+                <span>Click to Play Video</span>
+              </button>
+            </div>
+          )}
 
-      {/* Custom Player Controls */}
-      <VideoControls
-        video={video}
-        isPlaying={isPlaying}
-        isMuted={isMuted}
-        volume={volume}
-        currentTime={currentTime}
-        duration={duration}
-        isFullscreen={isFullscreen}
-        zoom={zoom}
-        showControls={showControls}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-        onVolumeChange={handleVolumeChange}
-        onToggleMute={handleToggleMute}
-        onToggleFullscreen={handleToggleFullscreen}
-        onTogglePiP={handleTogglePiP}
-        onZoomChange={setZoom}
-        onSkip={handleSkip}
-      />
+          <VideoControls
+            video={video}
+            isPlaying={isPlaying}
+            isMuted={isMuted}
+            volume={volume}
+            currentTime={currentTime}
+            duration={duration}
+            isFullscreen={isFullscreen}
+            zoom={zoom}
+            showControls={showControls}
+            onPlayPause={handlePlayPause}
+            onSeek={handleSeek}
+            onVolumeChange={handleVolumeChange}
+            onToggleMute={handleToggleMute}
+            onToggleFullscreen={handleToggleFullscreen}
+            onTogglePiP={handleTogglePiP}
+            onZoomChange={setZoom}
+            onSkip={handleSkip}
+          />
+        </>
+      )}
     </div>
   );
 };
