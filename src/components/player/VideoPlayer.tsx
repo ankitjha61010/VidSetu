@@ -68,18 +68,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   }, [video.driveFileId, video.webContentLink]);
 
   // 2. Exact Timestamp Auto-Resume when video metadata or duration is ready
-  const handleLoadedMetadata = () => {
+  const applyResumeTime = useCallback(() => {
     if (!videoRef.current) return;
-    const dur = videoRef.current.duration;
-    setDuration(dur);
-    setIsBuffering(false);
-
     try {
-      const savedTime = localStorage.getItem(STORAGE_PLAYBACK_KEY);
-      if (savedTime) {
-        const time = parseFloat(savedTime);
-        // If watched for more than 5s and didn't finish
-        if (time > 5 && (!dur || isNaN(dur) || time < dur - 10)) {
+      const saved = localStorage.getItem(STORAGE_PLAYBACK_KEY) || localStorage.getItem(`vidsetu_playback_${video.id}`);
+      if (saved) {
+        const time = parseFloat(saved);
+        if (time > 5) {
           videoRef.current.currentTime = time;
           setCurrentTime(time);
           const mins = Math.floor(time / 60);
@@ -91,6 +86,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     } catch (e) {
       console.warn('Failed to restore timestamp:', e);
     }
+  }, [STORAGE_PLAYBACK_KEY, video.id]);
+
+  const handleLoadedMetadata = () => {
+    if (!videoRef.current) return;
+    setDuration(videoRef.current.duration);
+    setIsBuffering(false);
+    applyResumeTime();
+  };
+
+  const handleCanPlay = () => {
+    setIsBuffering(false);
+    applyResumeTime();
   };
 
   // 3. Track time on every update and save immediately to device storage
@@ -100,6 +107,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     setCurrentTime(cur);
     if (cur > 3) {
       localStorage.setItem(STORAGE_PLAYBACK_KEY, cur.toString());
+      localStorage.setItem(`vidsetu_playback_${video.id}`, cur.toString());
     }
   };
 
@@ -267,7 +275,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
               }}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
-              onCanPlay={() => setIsBuffering(false)}
+              onCanPlay={handleCanPlay}
               onWaiting={() => setIsBuffering(true)}
               onPlaying={() => {
                 setIsBuffering(false);
