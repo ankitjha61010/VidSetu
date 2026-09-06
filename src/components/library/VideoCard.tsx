@@ -95,13 +95,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
           </div>
         )}
 
-        {/* Floating Expiration Badge */}
-        <div className="absolute top-2.5 right-2.5">
-          <ExpirationTimer
-            expiresAt={video.expiresAt}
-            onExpire={() => setIsExpired(true)}
-          />
-        </div>
+        {/* Floating Expiration Badge - only for temporary uploads */}
+        {video.expiresAt && video.expiresAt < video.createdAt + 24 * 60 * 60 * 1000 && (
+          <div className="absolute top-2.5 right-2.5">
+            <ExpirationTimer
+              expiresAt={video.expiresAt}
+              onExpire={() => setIsExpired(true)}
+            />
+          </div>
+        )}
 
         {/* File size tag */}
         <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[11px] font-mono font-medium text-slate-200">
