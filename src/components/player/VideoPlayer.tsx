@@ -80,30 +80,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     };
   }, [video.driveFileId, video.webContentLink, initialSavedTime]);
 
+  const hasResumedRef = useRef(false);
+
   // 2. Exact Timestamp Auto-Resume when video metadata or duration is ready
   const applyResumeTime = useCallback(() => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || hasResumedRef.current) return;
     try {
       const saved = localStorage.getItem(STORAGE_PLAYBACK_KEY) || localStorage.getItem(`vidsetu_playback_${video.id}`);
       if (saved) {
         const time = parseFloat(saved);
-        if (time > 0) {
+        if (time > 0.5) {
+          hasResumedRef.current = true;
           videoRef.current.currentTime = time;
           setCurrentTime(time);
           const mins = Math.floor(time / 60);
           const secs = Math.floor(time % 60);
-          setResumedNotice(`Resuming from ${mins}:${secs < 10 ? '0' : ''}${secs}`);
+          setResumedNotice(`Resumed from ${mins}:${secs < 10 ? '0' : ''}${secs}`);
           setTimeout(() => setResumedNotice(null), 4000);
         }
       }
-      // Attempt autoplay
-      videoRef.current.play().then(() => {
-        setIsPlaying(true);
-        setAutoplayBlocked(false);
-      }).catch((e) => {
-        console.warn('Autoplay prevented:', e);
-        setAutoplayBlocked(true);
-      });
     } catch (e) {
       console.warn('Failed to restore timestamp:', e);
     }
