@@ -2,11 +2,25 @@ import { googleAuth } from './googleAuth';
 import { DriveFolder, VideoMetadata } from '../types';
 
 const DRIVE_API_V3 = 'https://www.googleapis.com/drive/v3';
-const DEFAULT_VIDEOS_FOLDER_NAME = (import.meta as any).env?.VITE_DEFAULT_FOLDER_NAME || 'VidSetu_Videos';
-const DEFAULT_UPLOADS_FOLDER_NAME = (import.meta as any).env?.VITE_UPLOADS_FOLDER_NAME || 'VidSetu_Uploads';
 const STORAGE_KEY_FOLDER = 'vidsetu_active_folder';
 const STORAGE_KEY_UPLOAD_FOLDER = 'vidsetu_active_upload_folder';
 const STORAGE_KEY_LOCAL_METAS = 'vidsetu_local_video_metas';
+
+export const getCentralFolderId = (): string => {
+  return ((import.meta as any).env?.VITE_CENTRAL_FOLDER_ID || (import.meta as any).env?.VITE_PUBLIC_FOLDER_ID || '').trim();
+};
+
+export const getGoogleApiKey = (): string => {
+  return ((import.meta as any).env?.VITE_GOOGLE_API_KEY || '').trim();
+};
+
+export const getVideosFolderName = (): string => {
+  return ((import.meta as any).env?.VITE_DEFAULT_FOLDER_NAME || 'VidSetu_Videos').trim();
+};
+
+export const getUploadsFolderName = (): string => {
+  return ((import.meta as any).env?.VITE_UPLOADS_FOLDER_NAME || 'VidSetu_Uploads').trim();
+};
 
 export class DriveApiService {
   /**
@@ -62,9 +76,9 @@ export class DriveApiService {
       }
     }
 
-    // Search for existing folder
+    // Search for existing folders (there may be multiple folders named folderName in Drive)
     const q = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&spaces=drive`);
+    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`);
     const data = await res.json();
 
     if (data.files && data.files.length > 0) {
@@ -74,7 +88,7 @@ export class DriveApiService {
     }
 
     // Create folder
-    const createRes = await this.fetchDrive('/files', {
+    const createRes = await this.fetchDrive('/files?supportsAllDrives=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -91,17 +105,26 @@ export class DriveApiService {
   }
 
   /**
-   * Get or create library videos folder (VidSetu_Videos)
+   * Get or create library videos folder (VidSetu_Videos or VITE_DEFAULT_FOLDER_NAME)
    */
   public async getOrCreateVideosFolder(): Promise<DriveFolder> {
-    return this.getOrCreateFolderByName(DEFAULT_VIDEOS_FOLDER_NAME, STORAGE_KEY_FOLDER);
+    const centralFolderId = getCentralFolderId();
+    if (centralFolderId) {
+      const folder: DriveFolder = {
+        id: centralFolderId,
+        name: getVideosFolderName(),
+      };
+      this.saveActiveFolder(folder);
+      return folder;
+    }
+    return this.getOrCreateFolderByName(getVideosFolderName(), STORAGE_KEY_FOLDER);
   }
 
   /**
-   * Get or create designated uploads folder (VidSetu_Uploads)
+   * Get or create designated uploads folder (VidSetu_Uploads or VITE_UPLOADS_FOLDER_NAME)
    */
   public async getOrCreateUploadFolder(): Promise<DriveFolder> {
-    return this.getOrCreateFolderByName(DEFAULT_UPLOADS_FOLDER_NAME, STORAGE_KEY_UPLOAD_FOLDER);
+    return this.getOrCreateFolderByName(getUploadsFolderName(), STORAGE_KEY_UPLOAD_FOLDER);
   }
 
   /**
@@ -113,7 +136,7 @@ export class DriveApiService {
 
   public async getFolderDetails(folderId: string): Promise<DriveFolder | null> {
     try {
-      const res = await this.fetchDrive(`/files/${folderId}?fields=id,name,mimeType,trashed`);
+      const res = await this.fetchDrive(`/files/${folderId}?fields=id,name,mimeType,trashed&supportsAllDrives=true`);
       const data = await res.json();
       if (data.trashed || data.mimeType !== 'application/vnd.google-apps.folder') {
         return null;
@@ -125,6 +148,10 @@ export class DriveApiService {
   }
 
   public getSavedFolder(): DriveFolder | null {
+    const centralFolderId = getCentralFolderId();
+    if (centralFolderId) {
+      return { id: centralFolderId, name: getVideosFolderName() };
+    }
     const raw = localStorage.getItem(STORAGE_KEY_FOLDER);
     if (!raw) return null;
     try {
@@ -143,71 +170,128 @@ export class DriveApiService {
    */
   public async listUserFolders(): Promise<DriveFolder[]> {
     const q = `mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50&orderBy=name`);
+    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`);
     const data = await res.json();
     return data.files || [];
   }
 
   /**
-   * List videos stored strictly in the VidSetu_Videos folder for the movies library
+   * Helper to check if a Drive file is a movie/video file
+   */
+  public isVideoFile(file: any): boolean {
+    const mime = (file?.mimeType || '').toLowerCase().trim();
+    const name = (file?.name || '').toLowerCase().trim();
+
+    // Folders are not videos
+    if (mime === 'application/vnd.google-apps.folder' || mime.includes('folder')) {
+      return false;
+    }
+
+    // Explicit non-video extensions to reject
+    if (name.match(/\.(pdf|apk|zip|rar|7z|tar|gz|exe|dmg|iso|txt|doc|docx|xls|xlsx|ppt|pptx|png|jpg|jpeg|gif|webp|svg|mp3|wav|flac|aac|ogg)$/i)) {
+      return false;
+    }
+
+    // Explicit non-video MIME types to reject
+    if (
+      mime.startsWith('image/') ||
+      mime.startsWith('audio/') ||
+      mime.includes('pdf') ||
+      mime.includes('android.package-archive') ||
+      mime.includes('zip') ||
+      mime.includes('compressed') ||
+      mime.includes('document') ||
+      mime.includes('presentation') ||
+      mime.includes('spreadsheet')
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * List videos stored in the VidSetu_Videos folder(s) for the movies library
    */
   public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
-    let targetFolderId = folderId;
+    const targetFolderName = getVideosFolderName();
+    const centralFolderId = getCentralFolderId();
+    let folderIdsToSearch: string[] = [];
 
-    if (!targetFolderId) {
-      try {
-        const videosFolder = await this.getOrCreateVideosFolder();
-        targetFolderId = videosFolder.id;
-      } catch (e) {
-        console.warn('Videos folder resolution error:', e);
-      }
-    }
-
-    let q = '';
-    if (targetFolderId) {
-      q = `trashed = false and '${targetFolderId}' in parents`;
+    if (centralFolderId) {
+      // When a central server folder is configured, exclusively query that folder
+      folderIdsToSearch = [centralFolderId];
     } else {
-      q = `trashed = false and (mimeType contains 'video/' or name contains '.mp4' or name contains '.mkv')`;
-    }
-
-    let url = `/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
-    if (pageToken) {
-      url += `&pageToken=${encodeURIComponent(pageToken)}`;
-    }
-
-    let res = await this.fetchDrive(url);
-    let data = await res.json();
-
-    // If folder query returned 0 videos and no specific folderId was passed, do a fallback search for any video file in VidSetu_Videos folders
-    if ((!data.files || data.files.length === 0) && !pageToken && !folderId) {
-      const folderQ = `name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+      // Otherwise discover VidSetu_Videos folders in user's Drive
       try {
-        const folderRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`);
+        const folderQ = `name = '${targetFolderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+        const folderRes = await this.fetchDrive(
+          `/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`
+        );
         const folderData = await folderRes.json();
-        if (folderData.files && folderData.files.length > 0) {
-          const parentQueries = folderData.files.map((f: any) => `'${f.id}' in parents`).join(' or ');
-          const fallbackUrl = `/files?q=${encodeURIComponent(`trashed = false and (${parentQueries})`)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
-          const fallbackRes = await this.fetchDrive(fallbackUrl);
-          const fallbackData = await fallbackRes.json();
-          if (fallbackData.files && fallbackData.files.length > 0) {
-            data = fallbackData;
-          }
+        if (folderData.files && Array.isArray(folderData.files)) {
+          folderData.files.forEach((f: any) => {
+            if (f.id && !folderIdsToSearch.includes(f.id)) {
+              folderIdsToSearch.push(f.id);
+            }
+          });
         }
       } catch (e) {
-        console.warn('VidSetu_Videos discovery fallback search error:', e);
+        console.warn('[VidSetu] Error searching VidSetu folders:', e);
+      }
+
+      if (folderId && !folderIdsToSearch.includes(folderId)) {
+        folderIdsToSearch.push(folderId);
+      }
+
+      if (folderIdsToSearch.length === 0) {
+        try {
+          const defaultF = await this.getOrCreateVideosFolder();
+          if (defaultF?.id && !folderIdsToSearch.includes(defaultF.id)) {
+            folderIdsToSearch.push(defaultF.id);
+          }
+        } catch (e) {
+          console.warn('[VidSetu] Error getting default folder:', e);
+        }
       }
     }
+
+    let collectedFiles: any[] = [];
+    let lastNextPageToken: string | undefined = undefined;
+
+    // Query files from each identified folder
+    for (const fId of folderIdsToSearch) {
+      try {
+        const fileQ = `'${fId}' in parents and trashed = false`;
+        let url = `/files?q=${encodeURIComponent(fileQ)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,videoMediaMetadata,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        if (pageToken) {
+          url += `&pageToken=${encodeURIComponent(pageToken)}`;
+        }
+        const fileRes = await this.fetchDrive(url);
+        const fileData = await fileRes.json();
+        if (fileData.files && Array.isArray(fileData.files)) {
+          collectedFiles.push(...fileData.files);
+        }
+        if (fileData.nextPageToken) {
+          lastNextPageToken = fileData.nextPageToken;
+        }
+      } catch (err) {
+        console.warn(`[VidSetu] Error fetching files in folder ${fId}:`, err);
+      }
+    }
+
+    // Deduplicate by file ID
+    const uniqueFilesMap = new Map<string, any>();
+    collectedFiles.forEach((file) => {
+      if (file?.id && !uniqueFilesMap.has(file.id)) {
+        uniqueFilesMap.set(file.id, file);
+      }
+    });
 
     const localCache = this.getLocalMetadataCache();
 
-    // Filter to video files (MIME type video/*, video extensions, or generic binary video files)
-    const videoFiles = (data.files || []).filter((file: any) => {
-      const mime = (file.mimeType || '').toLowerCase();
-      const name = (file.name || '').toLowerCase();
-      const isVideoMime = mime.startsWith('video/') || mime.includes('video') || mime === 'application/vnd.google-apps.video' || mime === 'application/octet-stream';
-      const isVideoExt = name.match(/\.(mp4|mkv|webm|mov|avi|m4v|3gp|wmv|flv|ts|mpg|mpeg)$/i);
-      return (isVideoMime || isVideoExt) && mime !== 'application/vnd.google-apps.folder';
-    });
+    // Filter strictly to non-rejected video files
+    const videoFiles = Array.from(uniqueFilesMap.values()).filter((file: any) => this.isVideoFile(file));
 
     const videos: VideoMetadata[] = videoFiles.map((file: any) => {
       const appProps = file.appProperties || {};
@@ -236,7 +320,7 @@ export class DriveApiService {
         thumbnailLink: file.thumbnailLink,
         webContentLink: file.webContentLink,
         webViewLink: file.webViewLink,
-        driveFolderId: file.parents?.[0] || targetFolderId,
+        driveFolderId: file.parents?.[0] || folderIdsToSearch[0] || '',
       };
 
       // Keep cache updated
@@ -246,7 +330,7 @@ export class DriveApiService {
 
     return {
       videos,
-      nextPageToken: data.nextPageToken,
+      nextPageToken: lastNextPageToken,
     };
   }
 

@@ -40,8 +40,8 @@ export const VideoList: React.FC = () => {
       <EmptyState
         title="No Movies Found in 'VidSetu_Videos'"
         description="Place any movie file (.mp4, .mkv, .mov, .avi) directly inside your Google Drive 'VidSetu_Videos' folder and click Refresh."
-        actionHref=""
-        actionText=""
+        onAction={() => fetchVideos(true)}
+        actionText="Refresh Library"
       />
     );
   }

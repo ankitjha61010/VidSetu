@@ -7,14 +7,16 @@ interface EmptyStateProps {
   description?: string;
   actionHref?: string;
   actionText?: string;
+  onAction?: () => void;
   icon?: React.ReactNode;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title = 'No videos found',
   description = 'Upload your first video to Google Drive to share it seamlessly.',
-  actionHref = '/upload',
-  actionText = 'Upload Video',
+  actionHref,
+  actionText,
+  onAction,
   icon,
 }) => {
   return (
@@ -24,7 +26,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       </div>
       <h3 className="text-xl font-bold text-slate-100">{title}</h3>
       <p className="text-sm text-slate-400 mt-2 mb-6 leading-relaxed max-w-sm">{description}</p>
-      {actionHref && (
+      {actionHref && actionText && (
         <Link
           to={actionHref}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all duration-200"
@@ -32,6 +34,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           <UploadCloud className="w-4 h-4" />
           {actionText}
         </Link>
+      )}
+      {onAction && actionText && (
+        <button
+          onClick={onAction}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all duration-200"
+        >
+          <UploadCloud className="w-4 h-4" />
+          {actionText}
+        </button>
       )}
     </div>
   );

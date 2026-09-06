@@ -12,6 +12,7 @@ import { UploadPage } from './pages/UploadPage';
 import { WatchPage } from './pages/WatchPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
+import { SettingsPage } from './pages/SettingsPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
                   <Route path="/videos" element={<VideosPage />} />
                   <Route path="/upload" element={<UploadPage />} />
                   <Route path="/watch/:videoId" element={<WatchPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/404" element={<NotFoundPage />} />
