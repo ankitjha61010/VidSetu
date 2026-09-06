@@ -155,7 +155,11 @@ export class DriveApiService {
     const videosFolder = await this.getOrCreateVideosFolder();
     const targetFolderId = folderId || videosFolder?.id;
 
-    // Search query for videos in target folder, or with parent matching target folder
+    if (!targetFolderId) {
+      return { videos: [] };
+    }
+
+    // Strictly search ONLY files inside the VidSetu_Videos folder
     let q = `trashed = false and '${targetFolderId}' in parents`;
 
     let url = `/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`;
@@ -165,38 +169,6 @@ export class DriveApiService {
 
     let res = await this.fetchDrive(url);
     let data = await res.json();
-
-    // Fallback: If target folder returns 0 files, search for all VidSetu_Videos folders, or search video files across Drive
-    if ((!data.files || data.files.length === 0) && !pageToken) {
-      // 1. Try finding any folder named VidSetu_Videos
-      const folderQ = `trashed = false and name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder'`;
-      const searchRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)`);
-      const searchData = await searchRes.json();
-      
-      let foundAnyVideos = false;
-      if (searchData.files && searchData.files.length > 0) {
-        for (const f of searchData.files) {
-          const fallbackRes = await this.fetchDrive(`/files?q=${encodeURIComponent(`trashed = false and '${f.id}' in parents`)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
-          const fallbackData = await fallbackRes.json();
-          if (fallbackData.files && fallbackData.files.length > 0) {
-            data = fallbackData;
-            foundAnyVideos = true;
-            this.saveActiveFolder({ id: f.id, name: 'VidSetu_Videos' });
-            break;
-          }
-        }
-      }
-
-      // 2. If still empty, search for any video files in the user's Google Drive
-      if (!foundAnyVideos) {
-        const globalVideoQ = `trashed = false and (mimeType contains 'video/' or name contains '.mp4' or name contains '.mkv' or name contains '.webm' or name contains '.mov' or name contains '.avi') and mimeType != 'application/vnd.google-apps.folder'`;
-        const globalRes = await this.fetchDrive(`/files?q=${encodeURIComponent(globalVideoQ)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
-        const globalData = await globalRes.json();
-        if (globalData.files && globalData.files.length > 0) {
-          data = globalData;
-        }
-      }
-    }
 
     const localCache = this.getLocalMetadataCache();
 
