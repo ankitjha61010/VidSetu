@@ -24,7 +24,6 @@ import {
   FileText,
   File,
   Loader2,
-  ExternalLink,
 } from 'lucide-react';
 
 export const WatchPage: React.FC = () => {
@@ -142,34 +141,54 @@ export const WatchPage: React.FC = () => {
     );
   };
 
-  // Direct download handler
+  // Direct authenticated download handler (avoids Google anti-bot automated queries error page)
   const handleDownloadFile = async () => {
     try {
       setIsDownloading(true);
-      let downloadUrl = `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
+      let downloaded = false;
+
+      // 1. Try direct authorized Google Drive v3 media fetch
       try {
         const token = await googleAuth.getValidAccessToken();
         if (token) {
-          downloadUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = video.originalFileName || video.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            downloaded = true;
+          }
         }
-      } catch {
-        // Fallback to direct webContentLink
-        if (video.webContentLink) {
-          downloadUrl = video.webContentLink;
-        }
+      } catch (err) {
+        console.warn('Authenticated blob download fallback:', err);
       }
 
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = video.originalFileName || video.name;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // 2. Fallback to webContentLink if authenticated fetch did not trigger
+      if (!downloaded) {
+        const downloadUrl = video.webContentLink || `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = video.originalFileName || video.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch (e) {
       console.error('Download trigger error:', e);
-      window.open(`https://drive.google.com/uc?export=download&id=${video.driveFileId}`, '_blank');
+      if (video.webContentLink) {
+        window.location.href = video.webContentLink;
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -232,7 +251,7 @@ export const WatchPage: React.FC = () => {
               {isDownloading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Starting Download...</span>
+                  <span>Preparing Download...</span>
                 </>
               ) : (
                 <>
@@ -241,16 +260,6 @@ export const WatchPage: React.FC = () => {
                 </>
               )}
             </button>
-
-            <a
-              href={`https://drive.google.com/file/d/${video.driveFileId}/view`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 hover:border-slate-600 transition-all"
-            >
-              <ExternalLink className="w-4 h-4 text-slate-400" />
-              <span>Open in Browser</span>
-            </a>
           </div>
         </div>
       )}
