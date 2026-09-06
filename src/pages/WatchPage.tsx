@@ -62,7 +62,7 @@ export const WatchPage: React.FC = () => {
       <div className="py-24">
         <LoadingState
           message="Loading Video from Google Drive..."
-          subMessage="Verifying 5-hour access expiration metadata"
+          subMessage="Connecting to Google Drive stream"
           size="lg"
         />
       </div>

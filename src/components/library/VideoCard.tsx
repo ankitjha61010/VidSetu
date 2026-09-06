@@ -57,11 +57,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
 
   return (
     <div
-      className={`glass-panel rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col group ${
-        isExpired
+      className={`glass-panel rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col group ${isExpired
           ? 'border-rose-950/40 bg-slate-950/40 opacity-75'
           : 'border-slate-800 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/5'
-      }`}
+        }`}
     >
       {/* Thumbnail or Video Cover */}
       <div className="relative aspect-video w-full bg-slate-950 overflow-hidden flex items-center justify-center">
@@ -70,9 +69,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
             src={video.thumbnailLink}
             alt={video.name}
             referrerPolicy="no-referrer"
-            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-              isExpired ? 'grayscale contrast-75' : ''
-            }`}
+            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isExpired ? 'grayscale contrast-75' : ''
+              }`}
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-slate-600 group-hover:text-indigo-400/80 transition-colors">
@@ -154,14 +152,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
 
                 <DownloadButton video={video} variant="icon" />
 
-                <button
+                {/* <button
                   onClick={handleDelete}
                   disabled={isDeleting}
                   className="p-2 rounded-lg text-slate-400 hover:text-rose-400 bg-slate-800/80 hover:bg-rose-500/10 border border-slate-700/60 transition-colors disabled:opacity-50"
                   title="Delete from Google Drive"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </button> */}
               </div>
             </>
           ) : (

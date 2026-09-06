@@ -253,9 +253,12 @@ export class DriveApiService {
     const localCache = this.getLocalMetadataCache();
     const fallbackLocal = localCache[file.id] || {};
 
+    const hasExplicitExpiration = !!appProps.vidsetu_expires_at || !!fallbackLocal.expiresAt;
     const createdAt = parseInt(appProps.vidsetu_created_at || fallbackLocal.createdAt || new Date(file.createdTime || Date.now()).getTime(), 10);
-    const expiresAt = parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt || (createdAt + 5 * 60 * 60 * 1000), 10);
-    const isExpired = Date.now() > expiresAt;
+    const expiresAt = hasExplicitExpiration
+      ? parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt, 10)
+      : (createdAt + 10 * 365 * 24 * 60 * 60 * 1000);
+    const isExpired = hasExplicitExpiration && Date.now() > expiresAt;
 
     const meta: VideoMetadata = {
       id: file.id,
