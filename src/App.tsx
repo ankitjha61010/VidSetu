@@ -43,7 +43,7 @@ export const App: React.FC = () => {
               <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-slate-400">
                   <p>
-                    VidSetu • Frontend-Only Video Sharing & Watching Platform
+                    VidSetu • Powered by <span className="text-indigo-400 font-semibold">Abhishek Kashyap</span>
                   </p>
                   <div className="flex items-center gap-3 text-slate-400">
                     <Link to="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</Link>

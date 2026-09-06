@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { driveApi } from '../services/driveApi';
 import { expirationService } from '../services/expirationService';
 import { qrService } from '../services/qrService';
+import { googleAuth } from '../services/googleAuth';
 import { VideoPlayer } from '../components/player/VideoPlayer';
 import { ExpiredVideo } from '../components/player/ExpiredVideo';
 import { LoadingState } from '../components/common/LoadingState';
@@ -17,6 +18,13 @@ import {
   QrCode,
   ArrowLeft,
   ShieldCheck,
+  Download,
+  FileCode,
+  FileArchive,
+  FileText,
+  File,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 
 export const WatchPage: React.FC = () => {
@@ -24,12 +32,13 @@ export const WatchPage: React.FC = () => {
   const [video, setVideo] = useState<VideoMetadata | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (!videoId) {
-      setError('Invalid or missing video ID.');
+      setError('Invalid or missing file ID.');
       setIsLoading(false);
       return;
     }
@@ -41,14 +50,14 @@ export const WatchPage: React.FC = () => {
         const meta = await driveApi.getVideoMetadata(videoId);
         setVideo(meta);
 
-        // Check 5-hour expiration
+        // Check 3-day expiration
         const timeCheck = expirationService.getTimeRemaining(meta.expiresAt);
         if (timeCheck.isExpired || meta.isExpired) {
           setIsExpired(true);
         }
       } catch (err: any) {
         console.error('Watch video error:', err);
-        setError(err.message || 'Unable to locate or stream video from Google Drive.');
+        setError(err.message || 'Unable to locate or download file.');
       } finally {
         setIsLoading(false);
       }
@@ -61,8 +70,8 @@ export const WatchPage: React.FC = () => {
     return (
       <div className="py-24">
         <LoadingState
-          message="Loading Video from Google Drive..."
-          subMessage="Connecting to Google Drive stream"
+          message="Loading File Details..."
+          subMessage="Fetching file metadata"
           size="lg"
         />
       </div>
@@ -77,8 +86,8 @@ export const WatchPage: React.FC = () => {
     return (
       <div className="py-12">
         <ErrorState
-          title="Video Unavailable"
-          message={error || 'Video file not found or Google Drive permissions are required.'}
+          title="File Unavailable"
+          message={error || 'File not found or permissions are required.'}
           actionText="Back to Home"
           onRetry={() => (window.location.href = '/')}
         />
@@ -96,6 +105,76 @@ export const WatchPage: React.FC = () => {
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
 
+  // Helper to determine if file is a playable video format
+  const fileName = (video.originalFileName || video.name || '').toLowerCase();
+  const mimeType = (video.mimeType || '').toLowerCase();
+  const isVideoFile =
+    mimeType.startsWith('video/') ||
+    /\.(mp4|mkv|webm|mov|avi|m4v|3gp|wmv|flv|ts|mpg|mpeg)$/i.test(fileName);
+
+  // File type icon selector
+  const renderFileIcon = () => {
+    if (fileName.endsWith('.apk')) {
+      return (
+        <div className="w-24 h-24 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <FileCode className="w-12 h-12" />
+        </div>
+      );
+    }
+    if (fileName.match(/\.(zip|rar|7z|tar|gz|bz2)$/i)) {
+      return (
+        <div className="w-24 h-24 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <FileArchive className="w-12 h-12" />
+        </div>
+      );
+    }
+    if (fileName.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt)$/i)) {
+      return (
+        <div className="w-24 h-24 rounded-3xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+          <FileText className="w-12 h-12" />
+        </div>
+      );
+    }
+    return (
+      <div className="w-24 h-24 rounded-3xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+        <File className="w-12 h-12" />
+      </div>
+    );
+  };
+
+  // Direct download handler
+  const handleDownloadFile = async () => {
+    try {
+      setIsDownloading(true);
+      let downloadUrl = `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
+      try {
+        const token = await googleAuth.getValidAccessToken();
+        if (token) {
+          downloadUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
+        }
+      } catch {
+        // Fallback to direct webContentLink
+        if (video.webContentLink) {
+          downloadUrl = video.webContentLink;
+        }
+      }
+
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = video.originalFileName || video.name;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('Download trigger error:', e);
+      window.open(`https://drive.google.com/uc?export=download&id=${video.driveFileId}`, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Top back navigation */}
@@ -108,7 +187,7 @@ export const WatchPage: React.FC = () => {
           <span>Back to Library</span>
         </Link>
 
-        {/* Only show countdown timer if video actually has a temporary expiration (3 days) */}
+        {/* Only show countdown timer if file actually has a temporary expiration (3 days) */}
         {video.expiresAt && video.expiresAt < video.createdAt + 10 * 24 * 60 * 60 * 1000 && (
           <ExpirationTimer
             expiresAt={video.expiresAt}
@@ -117,12 +196,66 @@ export const WatchPage: React.FC = () => {
         )}
       </div>
 
-      {/* Main Video Player Container */}
-      <div className="w-full">
-        <VideoPlayer video={video} />
-      </div>
+      {/* Media or Universal File Download Container */}
+      {isVideoFile ? (
+        <div className="w-full">
+          <VideoPlayer video={video} />
+        </div>
+      ) : (
+        <div className="glass-card p-10 sm:p-14 rounded-3xl border border-slate-800 text-center relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      {/* Video Details & Interaction Panel */}
+          <div className="flex justify-center mb-6">{renderFileIcon()}</div>
+
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 mb-3">
+            FILE READY FOR DOWNLOAD
+          </span>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 max-w-xl mx-auto break-all">
+            {video.originalFileName || video.name}
+          </h2>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-slate-400 mb-8">
+            <span className="font-semibold text-slate-200">{formatFileSize(video.size)}</span>
+            <span>•</span>
+            <span className="font-mono text-indigo-300">{video.mimeType || 'Application/File'}</span>
+            <span>•</span>
+            <span className="text-emerald-400 font-semibold">Active for 3 Days</span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <button
+              onClick={handleDownloadFile}
+              disabled={isDownloading}
+              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-base shadow-xl shadow-indigo-600/40 hover:shadow-indigo-500/60 hover:scale-[1.02] transition-all disabled:opacity-50"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Starting Download...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  <span>Download File ({formatFileSize(video.size)})</span>
+                </>
+              )}
+            </button>
+
+            <a
+              href={`https://drive.google.com/file/d/${video.driveFileId}/view`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 hover:border-slate-600 transition-all"
+            >
+              <ExternalLink className="w-4 h-4 text-slate-400" />
+              <span>Open in Browser</span>
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Video / File Details & Interaction Panel */}
       <div className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div className="min-w-0 space-y-1">
@@ -146,7 +279,18 @@ export const WatchPage: React.FC = () => {
 
           {/* Quick Sharing Toolbar */}
           <div className="flex items-center gap-2 self-start lg:self-auto">
-            <CopyLinkButton url={watchUrl} />
+            {isVideoFile && (
+              <button
+                onClick={handleDownloadFile}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download</span>
+              </button>
+            )}
+
+            <CopyLinkButton url={watchUrl} label="Copy Link" />
 
             <button
               onClick={() => setShowQRModal(true)}
