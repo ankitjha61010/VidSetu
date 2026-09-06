@@ -36,11 +36,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const [mediaSrc, setMediaSrc] = useState<string>('');
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [useIframeFallback, setUseIframeFallback] = useState<boolean>(false);
-
   const deviceId = getDeviceId();
   const STORAGE_PLAYBACK_KEY = `vidsetu_playback_${deviceId}_${video.id}`;
 
-  // 1. Fetch direct authorized video stream URL
+  // Read saved timestamp synchronously on mount
+  const initialSavedTime = (() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_PLAYBACK_KEY) || localStorage.getItem(`vidsetu_playback_${video.id}`);
+      return saved ? parseFloat(saved) : 0;
+    } catch {
+      return 0;
+    }
+  })();
+
+  // 1. Fetch direct authorized video stream URL with timestamp offset
   useEffect(() => {
     let active = true;
 
@@ -49,13 +58,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
       try {
         const token = await googleAuth.getValidAccessToken();
         if (active) {
-          const streamUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
+          let streamUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
+          if (initialSavedTime > 5) {
+            streamUrl += `#t=${initialSavedTime}`;
+          }
           setMediaSrc(streamUrl);
         }
       } catch (err) {
         console.warn('Stream fetch token fallback:', err);
         if (active) {
-          setMediaSrc(video.webContentLink || '');
+          const fallback = video.webContentLink || '';
+          setMediaSrc(initialSavedTime > 5 ? `${fallback}#t=${initialSavedTime}` : fallback);
         }
       }
     };
@@ -65,7 +78,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     return () => {
       active = false;
     };
-  }, [video.driveFileId, video.webContentLink]);
+  }, [video.driveFileId, video.webContentLink, initialSavedTime]);
 
   // 2. Exact Timestamp Auto-Resume when video metadata or duration is ready
   const applyResumeTime = useCallback(() => {
