@@ -59,7 +59,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         const token = await googleAuth.getValidAccessToken();
         if (active) {
           let streamUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
-          if (initialSavedTime > 5) {
+          if (initialSavedTime > 0) {
             streamUrl += `#t=${initialSavedTime}`;
           }
           setMediaSrc(streamUrl);
@@ -68,7 +68,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         console.warn('Stream fetch token fallback:', err);
         if (active) {
           const fallback = video.webContentLink || '';
-          setMediaSrc(initialSavedTime > 5 ? `${fallback}#t=${initialSavedTime}` : fallback);
+          setMediaSrc(initialSavedTime > 0 ? `${fallback}#t=${initialSavedTime}` : fallback);
         }
       }
     };
@@ -87,15 +87,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
       const saved = localStorage.getItem(STORAGE_PLAYBACK_KEY) || localStorage.getItem(`vidsetu_playback_${video.id}`);
       if (saved) {
         const time = parseFloat(saved);
-        if (time > 5) {
+        if (time > 0) {
           videoRef.current.currentTime = time;
           setCurrentTime(time);
           const mins = Math.floor(time / 60);
           const secs = Math.floor(time % 60);
           setResumedNotice(`Resuming from ${mins}:${secs < 10 ? '0' : ''}${secs}`);
-          setTimeout(() => setResumedNotice(null), 5000);
+          setTimeout(() => setResumedNotice(null), 4000);
         }
       }
+      // Attempt autoplay
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+        setAutoplayBlocked(false);
+      }).catch((e) => {
+        console.warn('Autoplay prevented:', e);
+        setAutoplayBlocked(true);
+      });
     } catch (e) {
       console.warn('Failed to restore timestamp:', e);
     }
@@ -113,12 +121,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     applyResumeTime();
   };
 
-  // 3. Track time on every update and save immediately to device storage
+  // 3. Track time on every second and save immediately to device storage
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
     const cur = videoRef.current.currentTime;
     setCurrentTime(cur);
-    if (cur > 3) {
+    if (cur > 0.5) {
       localStorage.setItem(STORAGE_PLAYBACK_KEY, cur.toString());
       localStorage.setItem(`vidsetu_playback_${video.id}`, cur.toString());
     }
