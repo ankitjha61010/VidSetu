@@ -10,9 +10,9 @@ const STORAGE_KEY_LOCAL_METAS = 'vidsetu_local_video_metas';
 
 export class DriveApiService {
   /**
-   * Helper to perform authenticated Google Drive fetch requests
+   * Helper to perform authenticated Google Drive fetch requests with auto-retry on 401
    */
-  private async fetchDrive(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  private async fetchDrive(endpoint: string, options: RequestInit = {}, retryOn401: boolean = true): Promise<Response> {
     const token = await googleAuth.getValidAccessToken();
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${token}`);
@@ -21,6 +21,15 @@ export class DriveApiService {
       ...options,
       headers,
     });
+
+    if (res.status === 401 && retryOn401) {
+      // Token expired or invalidated, clear and prompt login
+      googleAuth.logout();
+      const newToken = await googleAuth.getValidAccessToken();
+      const retryHeaders = new Headers(options.headers || {});
+      retryHeaders.set('Authorization', `Bearer ${newToken}`);
+      return this.fetchDrive(endpoint, { ...options, headers: retryHeaders }, false);
+    }
 
     if (!res.ok) {
       let errDetail = '';
@@ -157,19 +166,34 @@ export class DriveApiService {
     let res = await this.fetchDrive(url);
     let data = await res.json();
 
-    // Fallback: If target folder returns 0 files, also check if user named a folder VidSetu_Videos or search across drive
+    // Fallback: If target folder returns 0 files, search for all VidSetu_Videos folders, or search video files across Drive
     if ((!data.files || data.files.length === 0) && !pageToken) {
-      const broadQ = `trashed = false and name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder'`;
-      const searchRes = await this.fetchDrive(`/files?q=${encodeURIComponent(broadQ)}&fields=files(id,name)`);
+      // 1. Try finding any folder named VidSetu_Videos
+      const folderQ = `trashed = false and name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder'`;
+      const searchRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)`);
       const searchData = await searchRes.json();
       
+      let foundAnyVideos = false;
       if (searchData.files && searchData.files.length > 0) {
-        const foundFolderId = searchData.files[0].id;
-        if (foundFolderId !== targetFolderId) {
-          const folder: DriveFolder = { id: foundFolderId, name: 'VidSetu_Videos' };
-          this.saveActiveFolder(folder);
-          const fallbackRes = await this.fetchDrive(`/files?q=${encodeURIComponent(`trashed = false and '${foundFolderId}' in parents`)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
-          data = await fallbackRes.json();
+        for (const f of searchData.files) {
+          const fallbackRes = await this.fetchDrive(`/files?q=${encodeURIComponent(`trashed = false and '${f.id}' in parents`)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData.files && fallbackData.files.length > 0) {
+            data = fallbackData;
+            foundAnyVideos = true;
+            this.saveActiveFolder({ id: f.id, name: 'VidSetu_Videos' });
+            break;
+          }
+        }
+      }
+
+      // 2. If still empty, search for any video files in the user's Google Drive
+      if (!foundAnyVideos) {
+        const globalVideoQ = `trashed = false and (mimeType contains 'video/' or name contains '.mp4' or name contains '.mkv' or name contains '.webm' or name contains '.mov' or name contains '.avi') and mimeType != 'application/vnd.google-apps.folder'`;
+        const globalRes = await this.fetchDrive(`/files?q=${encodeURIComponent(globalVideoQ)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc`);
+        const globalData = await globalRes.json();
+        if (globalData.files && globalData.files.length > 0) {
+          data = globalData;
         }
       }
     }
