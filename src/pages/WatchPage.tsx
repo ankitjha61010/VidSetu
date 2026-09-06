@@ -31,6 +31,7 @@ export const WatchPage: React.FC = () => {
   const [video, setVideo] = useState<VideoMetadata | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [downloadReason, setDownloadReason] = useState<'downloaded' | 'expired'>('expired');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
@@ -78,7 +79,7 @@ export const WatchPage: React.FC = () => {
   }
 
   if (isExpired) {
-    return <ExpiredVideo videoTitle={video?.name} expiredAt={video?.expiresAt} />;
+    return <ExpiredVideo videoTitle={video?.name} expiredAt={video?.expiresAt} reason={downloadReason} />;
   }
 
   if (error || !video) {
@@ -142,6 +143,7 @@ export const WatchPage: React.FC = () => {
   };
 
   // Direct download handler (works for anyone with link without requiring sign-in)
+  // After download is triggered, file is automatically purged from Drive and link expires
   const handleDownloadFile = async () => {
     try {
       setIsDownloading(true);
@@ -185,6 +187,22 @@ export const WatchPage: React.FC = () => {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        downloaded = true;
+      }
+
+      // 3. One-time link security: Delete file from Drive if it's a temporary upload, expire link, and show used state
+      const isTemporaryUpload = video.expiresAt && video.expiresAt < video.createdAt + 10 * 24 * 60 * 60 * 1000;
+      if (isTemporaryUpload) {
+        try {
+          // Permanently delete file from Google Drive
+          await driveApi.deleteVideo(video.driveFileId, true);
+        } catch (delErr) {
+          console.warn('Failed to delete file from drive after download:', delErr);
+        }
+
+        // Lock UI immediately
+        setDownloadReason('downloaded');
+        setIsExpired(true);
       }
     } catch (e) {
       console.error('Download trigger error:', e);
