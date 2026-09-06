@@ -149,11 +149,11 @@ export class DriveApiService {
   }
 
   /**
-   * List videos stored in the VidSetu_Videos folder with support for manual uploads & movies
+   * List videos stored in VidSetu folders (VidSetu_Videos and VidSetu_Uploads) with support for manual uploads & movies
    */
   public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
-    // 1. Search for all folders named VidSetu_Videos
-    const folderQ = `name = 'VidSetu_Videos' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    // 1. Search for all folders named VidSetu_Videos OR VidSetu_Uploads
+    const folderQ = `(name = 'VidSetu_Videos' or name = 'VidSetu_Uploads') and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
     const folderRes = await this.fetchDrive(`/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`);
     const folderData = await folderRes.json();
 
@@ -174,7 +174,7 @@ export class DriveApiService {
       targetFolderIds.push(defaultFolder.id);
     }
 
-    // Build query checking all VidSetu_Videos folder IDs (e.g. 'id1' in parents or 'id2' in parents)
+    // Build query checking all VidSetu folder IDs (e.g. 'id1' in parents or 'id2' in parents)
     const parentQueries = targetFolderIds.map((id) => `'${id}' in parents`).join(' or ');
     let q = `trashed = false and (${parentQueries})`;
 
