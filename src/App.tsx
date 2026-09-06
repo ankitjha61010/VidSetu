@@ -12,6 +12,9 @@ import { UploadPage } from './pages/UploadPage';
 import { WatchPage } from './pages/WatchPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { TermsPage } from './pages/TermsPage';
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -29,6 +32,8 @@ export const App: React.FC = () => {
                   <Route path="/videos" element={<VideosPage />} />
                   <Route path="/upload" element={<UploadPage />} />
                   <Route path="/watch/:videoId" element={<WatchPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
                   <Route path="/404" element={<NotFoundPage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
@@ -36,9 +41,16 @@ export const App: React.FC = () => {
 
               {/* Footer */}
               <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500 hidden md:block">
-                <p>
-                  VidSetu • Frontend-Only Video Sharing & Watching Platform • Google Drive & Netlify
-                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-slate-400">
+                  <p>
+                    VidSetu • Frontend-Only Video Sharing & Watching Platform
+                  </p>
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <a href="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</a>
+                    <span>•</span>
+                    <a href="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</a>
+                  </div>
+                </div>
               </footer>
 
               {/* Mobile Bottom Navigation */}
