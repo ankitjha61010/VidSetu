@@ -31,28 +31,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   // Prepare authenticated streaming media URL or direct stream
   useEffect(() => {
     let active = true;
-    let blobUrl: string | null = null;
 
     const setupStream = async () => {
-      setIsBuffering(true);
       try {
         const token = await googleAuth.getValidAccessToken();
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error('Failed to load video stream');
-        const blob = await res.blob();
         if (active) {
-          blobUrl = URL.createObjectURL(blob);
-          setMediaSrc(blobUrl);
-          setIsBuffering(false);
+          // Point directly to Google Drive stream endpoint with auth token query / header fallback
+          // or direct webContentLink for instant buffer playback
+          const streamUrl = `https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media&access_token=${encodeURIComponent(token)}`;
+          setMediaSrc(streamUrl);
         }
       } catch (err) {
         console.warn('Direct stream fetch fallback:', err);
         if (active) {
           setMediaSrc(video.webContentLink || '');
-          setIsBuffering(false);
         }
       }
     };
@@ -61,9 +53,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
 
     return () => {
       active = false;
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
     };
   }, [video.driveFileId, video.webContentLink]);
 
