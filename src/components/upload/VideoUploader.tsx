@@ -142,6 +142,7 @@ export const VideoUploader: React.FC = () => {
     setFileCategory('other');
     setProgressInfo(null);
     setUploaderInstance(null);
+    setUploadedVideo(null);
   };
 
   const watchUrl = uploadedVideo ? qrService.getWatchUrl(uploadedVideo.id) : '';
