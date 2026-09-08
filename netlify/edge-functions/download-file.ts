@@ -9,58 +9,9 @@
 // memory - neither works for multi-GB video files. Edge Functions can stream the response body
 // straight through as it arrives from Drive.
 import type { Config, Context } from '@netlify/edge-functions';
+import { getDriveAccessToken } from '../lib/googleDriveAuth.ts';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-
-function base64url(input: ArrayBuffer | string): string {
-  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function getServiceAccountToken(credentials: { client_email: string; private_key: string }): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const unsigned = `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${base64url(
-    JSON.stringify({
-      iss: credentials.client_email,
-      scope: 'https://www.googleapis.com/auth/drive.readonly',
-      aud: TOKEN_URL,
-      iat: now,
-      exp: now + 3600,
-    })
-  )}`;
-
-  const pemBody = credentials.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s+/g, '');
-  const derBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    derBytes,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
-  const jwt = `${unsigned}.${base64url(signature)}`;
-
-  const tokenRes = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    throw new Error(`Token exchange failed: ${tokenRes.status} ${await tokenRes.text()}`);
-  }
-
-  const data = await tokenRes.json();
-  return data.access_token;
-}
 
 export default async (request: Request, _context: Context) => {
   const url = new URL(request.url);
@@ -71,26 +22,12 @@ export default async (request: Request, _context: Context) => {
     return new Response('Missing id', { status: 400 });
   }
 
-  const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
-  if (!serviceAccountKey) {
-    console.error('GOOGLE_SERVICE_ACCOUNT_KEY is not configured');
-    return new Response('Server not configured', { status: 500 });
-  }
-
-  let credentials: { client_email: string; private_key: string };
-  try {
-    credentials = JSON.parse(serviceAccountKey);
-  } catch {
-    console.error('GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON');
-    return new Response('Server misconfigured', { status: 500 });
-  }
-
   let token: string;
   try {
-    token = await getServiceAccountToken(credentials);
+    token = await getDriveAccessToken();
   } catch (err) {
-    console.error('Failed to mint service-account access token:', err);
-    return new Response('Failed to authenticate with Google Drive', { status: 502 });
+    console.error('Failed to mint Drive access token:', err);
+    return new Response('Server not configured', { status: 500 });
   }
 
   const driveRes = await fetch(

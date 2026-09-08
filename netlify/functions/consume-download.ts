@@ -1,8 +1,8 @@
-// Runs server-side with a Google service-account credential so a link recipient (who never
-// signs into the uploader's Google account, and only ever holds public "reader" access) can
-// still trigger deletion of a one-time temporary upload after they download it.
-import { GoogleAuth } from 'google-auth-library';
+// Runs server-side with the uploader's own Google OAuth refresh token so a link recipient (who
+// never signs into the uploader's Google account, and only ever holds public "reader" access)
+// can still trigger deletion of a one-time temporary upload after they download it.
 import type { Config } from '@netlify/functions';
+import { getDriveAccessToken } from '../lib/googleDriveAuth';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
@@ -23,32 +23,12 @@ export default async (req: Request) => {
     return new Response('Missing fileId', { status: 400 });
   }
 
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    console.error('GOOGLE_SERVICE_ACCOUNT_KEY is not configured');
-    return new Response('Server not configured', { status: 500 });
-  }
-
-  let credentials: { client_email: string; private_key: string };
+  let token: string;
   try {
-    credentials = JSON.parse(serviceAccountKey);
-  } catch {
-    console.error('GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON');
-    return new Response('Server misconfigured', { status: 500 });
-  }
-
-  let token: string | null | undefined;
-  try {
-    const auth = new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/drive'] });
-    const client = await auth.getClient();
-    token = (await client.getAccessToken()).token;
+    token = await getDriveAccessToken();
   } catch (err) {
-    console.error('Failed to mint service-account access token:', err);
-    return new Response('Failed to authenticate with Google Drive', { status: 502 });
-  }
-
-  if (!token) {
-    return new Response('Failed to authenticate with Google Drive', { status: 502 });
+    console.error('Failed to mint Drive access token:', err);
+    return new Response('Server not configured', { status: 500 });
   }
 
   const metaRes = await fetch(
