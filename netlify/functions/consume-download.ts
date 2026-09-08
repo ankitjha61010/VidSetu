@@ -32,7 +32,7 @@ export default async (req: Request) => {
   }
 
   const metaRes = await fetch(
-    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,trashed,appProperties&supportsAllDrives=true`,
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,trashed,properties,appProperties&supportsAllDrives=true`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 
@@ -53,7 +53,7 @@ export default async (req: Request) => {
   // Only files explicitly marked as temporary one-time-download uploads (vidsetu_expires_at
   // set by ResumableUploader) can ever be deleted through this public endpoint - this is what
   // stops it being used to wipe permanent VidSetu_Videos library files.
-  if (!meta.appProperties?.vidsetu_expires_at) {
+  if (!meta.properties?.vidsetu_expires_at && !meta.appProperties?.vidsetu_expires_at) {
     return new Response('This file is not a temporary shared upload and cannot be auto-deleted', { status: 403 });
   }
 

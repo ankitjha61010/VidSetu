@@ -341,7 +341,7 @@ export class DriveApiService {
     const videoFiles = Array.from(uniqueFilesMap.values()).filter((file: any) => this.isVideoFile(file));
 
     const videos: VideoMetadata[] = videoFiles.map((file: any) => {
-      const appProps = file.appProperties || {};
+      const appProps = { ...file.appProperties, ...file.properties };
       const fallbackLocal = localCache[file.id] || {};
 
       const hasExplicitExpiration = !!appProps.vidsetu_expires_at || !!fallbackLocal.expiresAt;
@@ -390,7 +390,7 @@ export class DriveApiService {
     // 1. Try authenticated drive fetch if access token is available
     if (googleAuth.isAuthenticated()) {
       try {
-        const res = await this.fetchDrive(`/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,parents,trashed`);
+        const res = await this.fetchDrive(`/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties,parents,trashed`);
         file = await res.json();
       } catch (err) {
         console.warn('Authenticated file metadata fetch fallback to public:', err);
@@ -407,7 +407,7 @@ export class DriveApiService {
       if (apiKey) {
         try {
           const res = await fetch(
-            `${DRIVE_API_V3}/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,trashed&key=${apiKey}`
+            `${DRIVE_API_V3}/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties,trashed&key=${apiKey}`
           );
           if (res.ok) {
             file = await res.json();
@@ -458,7 +458,7 @@ export class DriveApiService {
       throw new Error('This file has been removed or deleted from Google Drive.');
     }
 
-    const appProps = file.appProperties || {};
+    const appProps = { ...file.appProperties, ...file.properties };
     const localCache = this.getLocalMetadataCache();
     const fallbackLocal = localCache[file.id] || {};
 

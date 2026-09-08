@@ -68,7 +68,12 @@ export class ResumableUploader {
       mimeType: this.file.type || 'application/octet-stream',
       parents: folder ? [folder] : [],
       description: `Uploaded via VidSetu. Expires at ${new Date(expiresAt).toISOString()}`,
-      appProperties: {
+      // Stored under `properties` (visible to all apps) rather than `appProperties` (private to
+      // the requesting app) because Drive refuses to return appProperties on an unauthenticated,
+      // API-key-only request - which is exactly how anonymous link recipients fetch metadata. If
+      // this lived only in appProperties, isTemporaryUpload() would read it as absent for them
+      // and skip deleting the file after their download.
+      properties: {
         vidsetu_created_at: createdAt.toString(),
         vidsetu_expires_at: expiresAt.toString(),
         original_name: this.file.name,
@@ -76,7 +81,7 @@ export class ResumableUploader {
     };
 
     const sessionRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties',
       {
         method: 'POST',
         headers: {
@@ -163,8 +168,8 @@ export class ResumableUploader {
               originalFileName: this.file.name,
               size: this.file.size,
               mimeType: fileData.mimeType,
-              createdAt: parseInt(fileData.appProperties?.vidsetu_created_at || Date.now().toString(), 10),
-              expiresAt: parseInt(fileData.appProperties?.vidsetu_expires_at || (Date.now() + EXPIRATION_DURATION_MS).toString(), 10),
+              createdAt: parseInt(fileData.properties?.vidsetu_created_at || fileData.appProperties?.vidsetu_created_at || Date.now().toString(), 10),
+              expiresAt: parseInt(fileData.properties?.vidsetu_expires_at || fileData.appProperties?.vidsetu_expires_at || (Date.now() + EXPIRATION_DURATION_MS).toString(), 10),
               isExpired: false,
               thumbnailLink: fileData.thumbnailLink,
               webContentLink: fileData.webContentLink,
