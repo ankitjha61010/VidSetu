@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { driveApi } from '../services/driveApi';
+import { driveApi, isTemporaryUpload, getDirectDownloadUrl } from '../services/driveApi';
 import { expirationService } from '../services/expirationService';
 import { qrService } from '../services/qrService';
 import { googleAuth } from '../services/googleAuth';
@@ -12,7 +12,7 @@ import { CopyLinkButton } from '../components/common/CopyLinkButton';
 import { QRModal } from '../components/common/QRModal';
 import { VideoMetadata } from '../types';
 import { formatFileSize, getFileTypeMeta, isVideoFile as isVideoFileType } from '../utils/fileType';
-import { TransferSpeedTracker, formatSpeed } from '../utils/transferSpeed';
+import { TransferSpeedTracker, formatSpeed, formatEta } from '../utils/transferSpeed';
 import {
   Calendar,
   HardDrive,
@@ -31,6 +31,7 @@ export const WatchPage: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadSpeed, setDownloadSpeed] = useState<number>(0);
+  const [downloadEta, setDownloadEta] = useState<number>(0);
   const speedTrackerRef = useRef(new TransferSpeedTracker());
   const [error, setError] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
@@ -117,6 +118,7 @@ export const WatchPage: React.FC = () => {
       setIsDownloading(true);
       setDownloadProgress(0);
       setDownloadSpeed(0);
+      setDownloadEta(0);
       speedTrackerRef.current.reset(0);
       let downloaded = false;
 
@@ -127,9 +129,10 @@ export const WatchPage: React.FC = () => {
           const blob = await driveApi.getVideoStreamBlob(
             video.driveFileId,
             (loaded, total) => {
-              const { percent, speed } = speedTrackerRef.current.update(loaded, total || video.size);
+              const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
               setDownloadProgress(percent);
               setDownloadSpeed(speed);
+              setDownloadEta(etaSeconds);
             },
             video.size
           );
@@ -147,11 +150,13 @@ export const WatchPage: React.FC = () => {
         }
       }
 
-      // 2. Direct public download for unauthenticated recipients (browser handles its own progress here)
+      // 2. Direct public download for unauthenticated recipients (browser handles its own progress here).
+      // Routed through our own /api/download-file proxy rather than drive.google.com directly -
+      // drive.google.com is a verified Android App Link, so a raw navigation there gets
+      // intercepted into a Google account-picker prompt instead of just downloading the file.
       if (!downloaded) {
-        const downloadUrl = video.webContentLink || `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
         const a = document.createElement('a');
-        a.href = downloadUrl;
+        a.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
         a.download = video.originalFileName || video.name;
         document.body.appendChild(a);
         a.click();
@@ -159,15 +164,12 @@ export const WatchPage: React.FC = () => {
         downloaded = true;
       }
 
-      // 3. One-time link security: Delete file from Drive if it's a temporary upload, expire link, and show used state
-      const isTemporaryUpload = video.expiresAt && video.expiresAt < video.createdAt + 10 * 24 * 60 * 60 * 1000;
-      if (isTemporaryUpload) {
-        try {
-          // Permanently delete file from Google Drive
-          await driveApi.deleteVideo(video.driveFileId, true);
-        } catch (delErr) {
-          console.warn('Failed to delete file from drive after download:', delErr);
-        }
+      // 3. One-time link security: Delete file from Drive if it's a temporary upload, expire link, and show used state.
+      // Recipients only ever hold public "reader" access and have no Drive credentials of their
+      // own, so deletion has to run server-side (via a service-account-backed endpoint) rather
+      // than through the client-side Drive API, which only the file's owner could authorize.
+      if (isTemporaryUpload(video)) {
+        await driveApi.consumeTemporaryDownload(video.driveFileId);
 
         // Lock UI immediately
         setDownloadReason('downloaded');
@@ -175,13 +177,12 @@ export const WatchPage: React.FC = () => {
       }
     } catch (e) {
       console.error('Download trigger error:', e);
-      if (video.webContentLink) {
-        window.location.href = video.webContentLink;
-      }
+      window.location.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
       setDownloadSpeed(0);
+      setDownloadEta(0);
     }
   };
 
@@ -225,7 +226,7 @@ export const WatchPage: React.FC = () => {
             <span className="text-emerald-400 font-semibold">Secure Direct Transfer</span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          <div className="flex flex-col items-center gap-3">
             <button
               onClick={handleDownloadFile}
               disabled={isDownloading}
@@ -236,7 +237,7 @@ export const WatchPage: React.FC = () => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>
                     {downloadProgress > 0
-                      ? `Downloading ${downloadProgress}% · ${formatSpeed(downloadSpeed)}`
+                      ? `Downloading ${downloadProgress}%`
                       : 'Preparing Download...'}
                   </span>
                 </>
@@ -247,6 +248,21 @@ export const WatchPage: React.FC = () => {
                 </>
               )}
             </button>
+
+            {isDownloading && (
+              <div className="w-full max-w-sm space-y-1.5">
+                <div className="h-2 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                  <span>{formatSpeed(downloadSpeed)}</span>
+                  <span>{downloadEta > 0 ? `${formatEta(downloadEta)} left` : 'Calculating...'}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

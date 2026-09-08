@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { driveApi } from '../../services/driveApi';
+import { driveApi, isTemporaryUpload, getDirectDownloadUrl } from '../../services/driveApi';
+import { googleAuth } from '../../services/googleAuth';
 import { useToast } from '../../context/ToastContext';
 import { VideoMetadata } from '../../types';
-import { TransferSpeedTracker, formatSpeed } from '../../utils/transferSpeed';
+import { TransferSpeedTracker, formatSpeed, formatEta } from '../../utils/transferSpeed';
 
 interface DownloadButtonProps {
   video: VideoMetadata;
@@ -21,6 +22,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadSpeed, setDownloadSpeed] = useState(0);
+  const [downloadEta, setDownloadEta] = useState(0);
   const speedTrackerRef = useRef(new TransferSpeedTracker());
   const { showToast } = useToast();
 
@@ -36,18 +38,27 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     setDownloading(true);
     setDownloadProgress(0);
     setDownloadSpeed(0);
+    setDownloadEta(0);
     speedTrackerRef.current.reset(0);
     try {
       showToast('Preparing Download', `Fetching "${video.originalFileName || video.name}"...`, 'info', 3000);
 
       const onStreamProgress = (loaded: number, total: number) => {
-        const { percent, speed } = speedTrackerRef.current.update(loaded, total || video.size);
+        const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
         setDownloadProgress(percent);
         setDownloadSpeed(speed);
+        setDownloadEta(etaSeconds);
       };
 
-      // If file is smaller than 250MB we can download as blob, or trigger direct Drive webContentLink
-      if (video.size < 250 * 1024 * 1024) {
+      // The signed-in owner can stream via the authenticated Drive API (small files) to get live
+      // progress. Everyone else - including anonymous link recipients, who only ever have public
+      // "reader" access and no Google session of their own - downloads through our own
+      // /api/download-file proxy instead of a drive.google.com link: on mobile, drive.google.com
+      // is a verified Android App Link, so navigating there gets intercepted into a Google
+      // account-picker prompt instead of just saving the file to the device.
+      const canUseAuthenticatedBlob = video.size < 250 * 1024 * 1024 && googleAuth.isAuthenticated();
+
+      if (canUseAuthenticatedBlob) {
         const blob = await driveApi.getVideoStreamBlob(video.driveFileId, onStreamProgress, video.size);
 
         const url = window.URL.createObjectURL(blob);
@@ -59,23 +70,23 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       } else {
-        // Direct stream download link - the browser's own download manager handles progress here
-        if (video.webContentLink) {
-          window.open(video.webContentLink, '_blank');
-        } else {
-          const blob = await driveApi.getVideoStreamBlob(video.driveFileId, onStreamProgress, video.size);
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = video.originalFileName || video.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
-        }
+        // Direct download link - the browser's own download manager handles progress here
+        const a = document.createElement('a');
+        a.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
+        a.download = video.originalFileName || video.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
 
-      showToast('Download Started', 'Your video file is downloading.', 'success');
+      // One-time link security: once a temporary share has been downloaded, remove it from Drive
+      // immediately instead of leaving it to sit there until the uploader happens to purge it.
+      if (isTemporaryUpload(video)) {
+        await driveApi.consumeTemporaryDownload(video.driveFileId);
+        showToast('Download Complete', 'This was a one-time link - the file has now been removed from Drive.', 'success');
+      } else {
+        showToast('Download Started', 'Your video file is downloading.', 'success');
+      }
     } catch (err: any) {
       console.error('Download error:', err);
       showToast('Download Failed', err.message || 'Unable to download file from Google Drive.', 'error');
@@ -83,24 +94,35 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       setDownloading(false);
       setDownloadProgress(0);
       setDownloadSpeed(0);
+      setDownloadEta(0);
     }
   };
 
   if (variant === 'icon') {
     return (
-      <button
-        onClick={handleDownload}
-        disabled={disabled || downloading || video.isExpired}
-        title={downloading ? `Downloading ${downloadProgress}% (${formatSpeed(downloadSpeed)})` : 'Download Video'}
-        className={`p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-        aria-label="Download Video"
-      >
-        {downloading ? (
-          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-        ) : (
-          <Download className="w-4 h-4" />
+      <div className={`flex flex-col items-stretch gap-1 ${className}`}>
+        <button
+          onClick={handleDownload}
+          disabled={disabled || downloading || video.isExpired}
+          title={downloading ? `Downloading ${downloadProgress}% · ${formatSpeed(downloadSpeed)} · ${formatEta(downloadEta)} left` : 'Download Video'}
+          className="p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Download Video"
+        >
+          {downloading ? (
+            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+        </button>
+        {downloading && (
+          <div className="w-9 h-1 rounded-full bg-slate-800 border border-slate-700/60 overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 transition-all duration-300 ease-out rounded-full"
+              style={{ width: `${downloadProgress}%` }}
+            />
+          </div>
         )}
-      </button>
+      </div>
     );
   }
 
@@ -110,7 +132,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         onClick={handleDownload}
         disabled={disabled || downloading || video.isExpired}
         className={`p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-40 ${className}`}
-        title={downloading ? `Downloading ${downloadProgress}% (${formatSpeed(downloadSpeed)})` : 'Download Video'}
+        title={downloading ? `Downloading ${downloadProgress}% · ${formatSpeed(downloadSpeed)} · ${formatEta(downloadEta)} left` : 'Download Video'}
       >
         {downloading ? (
           <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
@@ -122,22 +144,38 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   }
 
   return (
-    <button
-      onClick={handleDownload}
-      disabled={disabled || downloading || video.isExpired}
-      className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 hover:text-white border border-slate-700 hover:border-slate-600 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-    >
-      {downloading ? (
-        <>
-          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-          <span>{downloadProgress > 0 ? `${downloadProgress}% · ${formatSpeed(downloadSpeed)}` : 'Downloading...'}</span>
-        </>
-      ) : (
-        <>
-          <Download className="w-4 h-4" />
-          <span>Download</span>
-        </>
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <button
+        onClick={handleDownload}
+        disabled={disabled || downloading || video.isExpired}
+        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 hover:text-white border border-slate-700 hover:border-slate-600 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {downloading ? (
+          <>
+            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+            <span>{downloadProgress > 0 ? `${downloadProgress}% · ${formatSpeed(downloadSpeed)}` : 'Downloading...'}</span>
+          </>
+        ) : (
+          <>
+            <Download className="w-4 h-4" />
+            <span>Download</span>
+          </>
+        )}
+      </button>
+      {downloading && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 transition-all duration-300 ease-out rounded-full"
+              style={{ width: `${downloadProgress}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+            <span>{formatSpeed(downloadSpeed)}</span>
+            <span>{downloadEta > 0 ? `${formatEta(downloadEta)} left` : ''}</span>
+          </div>
+        </div>
       )}
-    </button>
+    </div>
   );
 };
