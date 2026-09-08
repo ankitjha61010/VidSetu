@@ -65,7 +65,7 @@ export class ResumableUploader {
 
     const metadata = {
       name: this.file.name,
-      mimeType: this.file.type || 'video/mp4',
+      mimeType: this.file.type || 'application/octet-stream',
       parents: folder ? [folder] : [],
       description: `Uploaded via VidSetu. Expires at ${new Date(expiresAt).toISOString()}`,
       appProperties: {
@@ -82,7 +82,7 @@ export class ResumableUploader {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': this.file.type || 'video/mp4',
+          'X-Upload-Content-Type': this.file.type || 'application/octet-stream',
           'X-Upload-Content-Length': this.file.size.toString(),
         },
         body: JSON.stringify(metadata),

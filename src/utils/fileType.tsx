@@ -82,7 +82,9 @@ export const FileTypeIcon: React.FC<{ fileName: string; mimeType?: string; class
 
 export function formatFileSize(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 B';
-  const k = 1024;
+  // Decimal (1000-based) units, matching what OS file pickers / phones report -
+  // a 1024-based calculation labeled "MB" reads as a smaller, "wrong" number to users.
+  const k = 1000;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;

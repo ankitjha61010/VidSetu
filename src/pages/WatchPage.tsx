@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { driveApi, isTemporaryUpload, getDirectDownloadUrl } from '../services/driveApi';
+import { driveApi, isTemporaryUpload, getDirectDownloadUrl, fetchBlobWithProgress } from '../services/driveApi';
+import { useToast } from '../context/ToastContext';
 import { expirationService } from '../services/expirationService';
 import { qrService } from '../services/qrService';
 import { googleAuth } from '../services/googleAuth';
@@ -24,6 +25,7 @@ import {
 
 export const WatchPage: React.FC = () => {
   const { videoId } = useParams<{ videoId: string }>();
+  const { showToast } = useToast();
   const [video, setVideo] = useState<VideoMetadata | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExpired, setIsExpired] = useState<boolean>(false);
@@ -150,17 +152,32 @@ export const WatchPage: React.FC = () => {
         }
       }
 
-      // 2. Direct public download for unauthenticated recipients (browser handles its own progress here).
-      // Routed through our own /api/download-file proxy rather than drive.google.com directly -
-      // drive.google.com is a verified Android App Link, so a raw navigation there gets
-      // intercepted into a Google account-picker prompt instead of just downloading the file.
+      // 2. Direct public download for unauthenticated recipients, routed through our own
+      // /api/download-file proxy rather than drive.google.com directly - drive.google.com is a
+      // verified Android App Link, so a raw navigation there gets intercepted into a Google
+      // account-picker prompt instead of just downloading the file. Fetched (rather than a plain
+      // <a> navigation) so a broken/misrouted proxy response is caught here and surfaced as an
+      // error instead of silently being saved as if it were the real file.
       if (!downloaded) {
+        const blob = await fetchBlobWithProgress(
+          getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
+          {},
+          (loaded, total) => {
+            const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
+            setDownloadProgress(percent);
+            setDownloadSpeed(speed);
+            setDownloadEta(etaSeconds);
+          },
+          video.size
+        );
+        const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
+        a.href = blobUrl;
         a.download = video.originalFileName || video.name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
         downloaded = true;
       }
 
@@ -175,9 +192,9 @@ export const WatchPage: React.FC = () => {
         setDownloadReason('downloaded');
         setIsExpired(true);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Download trigger error:', e);
-      window.location.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
+      showToast('Download Failed', e?.message || 'Unable to download this file right now.', 'error', 8000);
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);

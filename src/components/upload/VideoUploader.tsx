@@ -303,23 +303,23 @@ export const VideoUploader: React.FC = () => {
                   </h3>
 
                   <div className="grid grid-cols-2 gap-3 text-xs pt-1">
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-slate-400 block">File Size:</span>
                       <span className="font-semibold text-slate-200">{formatFileSize(selectedFile.size)}</span>
                     </div>
-                    <div>
+                    <div className="min-w-0" title={`${getFileTypeMeta(selectedFile.name, selectedFile.type).label} (${selectedFile.type || 'unknown'})`}>
                       <span className="text-slate-400 block">File Type:</span>
-                      <span className="font-semibold text-slate-200 truncate">
+                      <span className="font-semibold text-slate-200 truncate block">
                         {getFileTypeMeta(selectedFile.name, selectedFile.type).label} ({selectedFile.type || 'unknown'})
                       </span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-slate-400 block">Target Upload Folder:</span>
-                      <span className="font-semibold text-indigo-300 truncate">
+                      <span className="font-semibold text-indigo-300 truncate block">
                         {uploadFolder?.name || 'VidSetu_Uploads'}
                       </span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-slate-400 block">Transfer Security:</span>
                       <span className="font-semibold text-emerald-400">Auto-Deleted on Download</span>
                     </div>

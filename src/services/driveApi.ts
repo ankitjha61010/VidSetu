@@ -38,6 +38,56 @@ export const getDirectDownloadUrl = (fileId: string, fileName: string): string =
   return `/api/download-file?${params.toString()}`;
 };
 
+// Fetches a URL as a Blob, reporting byte progress as it streams in, and validates the response
+// before handing back a Blob. Without that validation, a misrouted request (e.g. /api/download-file
+// hit while running plain `vite dev`, which has no Netlify Functions/Edge Functions and falls back
+// to serving the SPA's own index.html) silently "succeeds" with the wrong content - the browser
+// then happily saves that HTML as if it were the real file, with no visible error at all.
+export async function fetchBlobWithProgress(
+  url: string,
+  init: RequestInit = {},
+  onProgress?: (loadedBytes: number, totalBytes: number) => void,
+  expectedSize?: number
+): Promise<Blob> {
+  const res = await fetch(url, init);
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(detail || `Download failed (HTTP ${res.status})`);
+  }
+
+  const contentType = res.headers.get('Content-Type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error(
+      'The download endpoint returned a web page instead of the file. If you are running this app with "npm run dev" locally, use "netlify dev" instead (or test on the deployed site) - the download proxy is a Netlify Function and does not exist under plain Vite dev.'
+    );
+  }
+
+  if (!res.body || !onProgress) {
+    return await res.blob();
+  }
+
+  const contentLength = +(res.headers.get('Content-Length') || 0);
+  // Content-Length isn't always exposed; fall back to the caller-supplied known size so
+  // progress doesn't silently stay stuck at 0.
+  const totalBytes = contentLength > 0 ? contentLength : (expectedSize || 0);
+  const reader = res.body.getReader();
+  let receivedBytes = 0;
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      receivedBytes += value.length;
+      onProgress(receivedBytes, totalBytes);
+    }
+  }
+
+  return new Blob(chunks as any, { type: contentType || 'application/octet-stream' });
+}
+
 export class DriveApiService {
   /**
    * Helper to perform authenticated Google Drive fetch requests with auto-retry on 401
@@ -347,7 +397,29 @@ export class DriveApiService {
       }
     }
 
-    // 2. If not authenticated or failed, fetch metadata via public endpoint or cached metadata
+    // 2. If not authenticated or failed, fetch metadata via public endpoint or cached metadata.
+    // The local cache is only ever populated on the uploader's own browser (localStorage), so a
+    // recipient opening the link on a different device always misses it - for them we need a
+    // real unauthenticated request. Drive supports that with just an API key (no OAuth) as long
+    // as the file has "anyone with link" reader access, which makeFilePublic() already grants.
+    if (!file || !file.id) {
+      const apiKey = getGoogleApiKey();
+      if (apiKey) {
+        try {
+          const res = await fetch(
+            `${DRIVE_API_V3}/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,appProperties,trashed&key=${apiKey}`
+          );
+          if (res.ok) {
+            file = await res.json();
+          } else {
+            console.warn('Public API-key metadata fetch failed:', res.status, await res.text());
+          }
+        } catch (err) {
+          console.warn('Public API-key metadata fetch error:', err);
+        }
+      }
+    }
+
     if (!file || !file.id) {
       const localCache = this.getLocalMetadataCache();
       const cached = localCache[fileId];
@@ -367,7 +439,9 @@ export class DriveApiService {
           },
         };
       } else {
-        // Unauthenticated fetch attempt with fallback basic file structure
+        // Last resort: neither an authenticated session, a working API key, nor a local cache
+        // entry could identify this file - fall back to a bare placeholder rather than erroring
+        // out entirely, since the direct download/view links still work without any metadata.
         file = {
           id: fileId,
           name: 'Shared File',
@@ -485,40 +559,12 @@ export class DriveApiService {
     expectedSize?: number
   ): Promise<Blob> {
     const token = await googleAuth.getValidAccessToken();
-    const res = await fetch(`${DRIVE_API_V3}/files/${fileId}?alt=media`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to stream video content from Google Drive (${res.status})`);
-    }
-
-    if (!res.body || !onProgress) {
-      return await res.blob();
-    }
-
-    const contentLength = +(res.headers.get('Content-Length') || 0);
-    // Content-Length isn't always exposed by the Drive API response; fall back to the
-    // caller-supplied known file size so progress doesn't silently stay stuck at 0.
-    const totalBytes = contentLength > 0 ? contentLength : (expectedSize || 0);
-    const reader = res.body.getReader();
-    let receivedBytes = 0;
-    const chunks: Uint8Array[] = [];
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        chunks.push(value);
-        receivedBytes += value.length;
-        onProgress(receivedBytes, totalBytes);
-      }
-    }
-
-    const contentType = res.headers.get('Content-Type') || 'video/mp4';
-    return new Blob(chunks as any, { type: contentType });
+    return fetchBlobWithProgress(
+      `${DRIVE_API_V3}/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      onProgress,
+      expectedSize
+    );
   }
 
   /**

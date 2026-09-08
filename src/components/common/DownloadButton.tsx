@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { driveApi, isTemporaryUpload, getDirectDownloadUrl } from '../../services/driveApi';
+import { driveApi, isTemporaryUpload, getDirectDownloadUrl, fetchBlobWithProgress } from '../../services/driveApi';
 import { googleAuth } from '../../services/googleAuth';
 import { useToast } from '../../context/ToastContext';
 import { VideoMetadata } from '../../types';
@@ -70,13 +70,24 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       } else {
-        // Direct download link - the browser's own download manager handles progress here
+        // Fetched (rather than a plain <a> navigation) so a broken/misrouted proxy response -
+        // e.g. running under plain "vite dev", which has no Netlify Functions and falls back to
+        // serving the SPA's own index.html - is caught here and surfaced as an error, instead of
+        // silently being saved to disk as if it were the real file.
+        const blob = await fetchBlobWithProgress(
+          getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
+          {},
+          onStreamProgress,
+          video.size
+        );
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name);
+        a.href = url;
         a.download = video.originalFileName || video.name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
       }
 
       // One-time link security: once a temporary share has been downloaded, remove it from Drive
