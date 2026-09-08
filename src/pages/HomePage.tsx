@@ -23,7 +23,7 @@ export const HomePage: React.FC = () => {
     },
     {
       icon: Zap,
-      title: '6 GB Resumable Uploads',
+      title: '12 GB Resumable Uploads',
       desc: 'Chunked multi-part uploads with pause/resume, speed indicators, network retry, and no JavaScript heap overload.',
     },
     {
@@ -57,7 +57,7 @@ export const HomePage: React.FC = () => {
 
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 mb-6 animate-pulse-subtle">
           <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-          Pure Frontend Architecture • High-Speed 6 GB Transfers • Zero Server Storage
+          Pure Frontend Architecture • High-Speed 12 GB Transfers • Zero Server Storage
         </div>
 
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1] max-w-4xl mx-auto">
@@ -68,7 +68,7 @@ export const HomePage: React.FC = () => {
         </h1>
 
         <p className="mt-6 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Upload up to 6 GB files & videos with resumable chunking, enjoy instant streaming, generate shareable QR links, and maintain private 5-hour lifespans.
+          Upload up to 12 GB files & videos with resumable chunking, enjoy instant streaming, generate shareable QR links, and maintain private 5-hour lifespans.
         </p>
 
         {/* CTA Buttons */}
@@ -80,7 +80,7 @@ export const HomePage: React.FC = () => {
                 className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white font-bold text-base shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all border border-indigo-400/30"
               >
                 <UploadCloud className="w-5 h-5" />
-                <span>Upload Files (6 GB)</span>
+                <span>Upload Files (12 GB)</span>
               </Link>
               <Link
                 to="/videos"

@@ -457,7 +457,11 @@ export class DriveApiService {
   /**
    * Fetch a streamable/downloadable direct media blob or range URL
    */
-  public async getVideoStreamBlob(fileId: string, onProgress?: (percent: number) => void): Promise<Blob> {
+  public async getVideoStreamBlob(
+    fileId: string,
+    onProgress?: (loadedBytes: number, totalBytes: number) => void,
+    expectedSize?: number
+  ): Promise<Blob> {
     const token = await googleAuth.getValidAccessToken();
     const res = await fetch(`${DRIVE_API_V3}/files/${fileId}?alt=media`, {
       headers: {
@@ -474,6 +478,9 @@ export class DriveApiService {
     }
 
     const contentLength = +(res.headers.get('Content-Length') || 0);
+    // Content-Length isn't always exposed by the Drive API response; fall back to the
+    // caller-supplied known file size so progress doesn't silently stay stuck at 0.
+    const totalBytes = contentLength > 0 ? contentLength : (expectedSize || 0);
     const reader = res.body.getReader();
     let receivedBytes = 0;
     const chunks: Uint8Array[] = [];
@@ -484,9 +491,7 @@ export class DriveApiService {
       if (value) {
         chunks.push(value);
         receivedBytes += value.length;
-        if (contentLength > 0) {
-          onProgress(Math.round((receivedBytes / contentLength) * 100));
-        }
+        onProgress(receivedBytes, totalBytes);
       }
     }
 

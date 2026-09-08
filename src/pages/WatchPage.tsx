@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { driveApi } from '../services/driveApi';
 import { expirationService } from '../services/expirationService';
@@ -11,16 +11,14 @@ import { ErrorState } from '../components/common/ErrorState';
 import { CopyLinkButton } from '../components/common/CopyLinkButton';
 import { QRModal } from '../components/common/QRModal';
 import { VideoMetadata } from '../types';
+import { formatFileSize, getFileTypeMeta, isVideoFile as isVideoFileType } from '../utils/fileType';
+import { TransferSpeedTracker, formatSpeed } from '../utils/transferSpeed';
 import {
   Calendar,
   HardDrive,
   QrCode,
   ArrowLeft,
   Download,
-  FileCode,
-  FileArchive,
-  FileText,
-  File,
   Loader2,
 } from 'lucide-react';
 
@@ -31,6 +29,9 @@ export const WatchPage: React.FC = () => {
   const [isExpired, setIsExpired] = useState<boolean>(false);
   const [downloadReason, setDownloadReason] = useState<'downloaded' | 'expired'>('expired');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [downloadSpeed, setDownloadSpeed] = useState<number>(0);
+  const speedTrackerRef = useRef(new TransferSpeedTracker());
   const [error, setError] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
 
@@ -95,47 +96,16 @@ export const WatchPage: React.FC = () => {
 
   const watchUrl = qrService.getWatchUrl(video.id);
 
-  const formatFileSize = (bytes: number): string => {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
-
   // Helper to determine if file is a playable video format
-  const fileName = (video.originalFileName || video.name || '').toLowerCase();
-  const mimeType = (video.mimeType || '').toLowerCase();
-  const isVideoFile =
-    mimeType.startsWith('video/') ||
-    /\.(mp4|mkv|webm|mov|avi|m4v|3gp|wmv|flv|ts|mpg|mpeg)$/i.test(fileName);
+  const fileName = video.originalFileName || video.name || '';
+  const isVideoFile = isVideoFileType(fileName, video.mimeType);
 
-  // File type icon selector
+  // File type icon selector - covers video/image/audio/apk-aab-ipa/archive/document/other
   const renderFileIcon = () => {
-    if (fileName.endsWith('.apk')) {
-      return (
-        <div className="w-24 h-24 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-          <FileCode className="w-12 h-12" />
-        </div>
-      );
-    }
-    if (fileName.match(/\.(zip|rar|7z|tar|gz|bz2)$/i)) {
-      return (
-        <div className="w-24 h-24 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-          <FileArchive className="w-12 h-12" />
-        </div>
-      );
-    }
-    if (fileName.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt)$/i)) {
-      return (
-        <div className="w-24 h-24 rounded-3xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-          <FileText className="w-12 h-12" />
-        </div>
-      );
-    }
+    const meta = getFileTypeMeta(fileName, video.mimeType);
     return (
-      <div className="w-24 h-24 rounded-3xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-        <File className="w-12 h-12" />
+      <div className={`w-24 h-24 rounded-3xl ${meta.bg} border ${meta.border} flex items-center justify-center ${meta.iconColor}`}>
+        <meta.Icon className="w-12 h-12" />
       </div>
     );
   };
@@ -145,38 +115,39 @@ export const WatchPage: React.FC = () => {
   const handleDownloadFile = async () => {
     try {
       setIsDownloading(true);
+      setDownloadProgress(0);
+      setDownloadSpeed(0);
+      speedTrackerRef.current.reset(0);
       let downloaded = false;
 
       // 1. If user is already authenticated in this session, use authorized Google Drive API stream
+      //    with live progress reporting so the user can see percent/speed instead of a static spinner.
       if (googleAuth.isAuthenticated()) {
         try {
-          const token = await googleAuth.getValidAccessToken();
-          if (token) {
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${video.driveFileId}?alt=media`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-
-            if (res.ok) {
-              const blob = await res.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = blobUrl;
-              a.download = video.originalFileName || video.name;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-              downloaded = true;
-            }
-          }
+          const blob = await driveApi.getVideoStreamBlob(
+            video.driveFileId,
+            (loaded, total) => {
+              const { percent, speed } = speedTrackerRef.current.update(loaded, total || video.size);
+              setDownloadProgress(percent);
+              setDownloadSpeed(speed);
+            },
+            video.size
+          );
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = video.originalFileName || video.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          downloaded = true;
         } catch (err) {
           console.warn('Authenticated blob download fallback:', err);
         }
       }
 
-      // 2. Direct public download for unauthenticated recipients
+      // 2. Direct public download for unauthenticated recipients (browser handles its own progress here)
       if (!downloaded) {
         const downloadUrl = video.webContentLink || `https://drive.google.com/uc?export=download&id=${video.driveFileId}`;
         const a = document.createElement('a');
@@ -209,6 +180,8 @@ export const WatchPage: React.FC = () => {
       }
     } finally {
       setIsDownloading(false);
+      setDownloadProgress(0);
+      setDownloadSpeed(0);
     }
   };
 
@@ -228,7 +201,7 @@ export const WatchPage: React.FC = () => {
       {/* Media or Universal File Download Container */}
       {isVideoFile ? (
         <div className="w-full">
-          <VideoPlayer video={video} />
+          <VideoPlayer video={video} onDownload={handleDownloadFile} isDownloading={isDownloading} />
         </div>
       ) : (
         <div className="glass-card p-6 sm:p-10 md:p-14 rounded-2xl sm:rounded-3xl border border-slate-800 text-center relative overflow-hidden shadow-2xl">
@@ -261,7 +234,11 @@ export const WatchPage: React.FC = () => {
               {isDownloading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Preparing Download...</span>
+                  <span>
+                    {downloadProgress > 0
+                      ? `Downloading ${downloadProgress}% · ${formatSpeed(downloadSpeed)}`
+                      : 'Preparing Download...'}
+                  </span>
                 </>
               ) : (
                 <>
@@ -302,10 +279,15 @@ export const WatchPage: React.FC = () => {
               <button
                 onClick={handleDownloadFile}
                 disabled={isDownloading}
-                className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all"
+                title={isDownloading ? `Downloading ${downloadProgress}% (${formatSpeed(downloadSpeed)})` : 'Download Video'}
+                className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all disabled:opacity-60"
               >
-                <Download className="w-4 h-4" />
-                <span>Download</span>
+                {isDownloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>{isDownloading && downloadProgress > 0 ? `${downloadProgress}%` : 'Download'}</span>
               </button>
             )}
 

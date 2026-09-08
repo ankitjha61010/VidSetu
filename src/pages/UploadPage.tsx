@@ -9,7 +9,7 @@ export const UploadPage: React.FC = () => {
           Upload & Share Files
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-2">
-          Upload up to 6 GB files with resumable chunking. Files automatically expire 5 hours after completion.
+          Upload up to 12 GB files with resumable chunking. Files automatically expire 5 hours after completion.
         </p>
       </div>
 

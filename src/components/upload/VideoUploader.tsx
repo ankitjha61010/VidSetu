@@ -8,9 +8,9 @@ import { UploadProgressInfo, VideoMetadata } from '../../types';
 import { qrService } from '../../services/qrService';
 import { CopyLinkButton } from '../common/CopyLinkButton';
 import { QRModal } from '../common/QRModal';
+import { FileCategory, formatFileSize, getFileTypeMeta } from '../../utils/fileType';
 import {
   UploadCloud,
-  FileVideo,
   CheckCircle2,
   QrCode,
   ShieldAlert,
@@ -23,6 +23,7 @@ export const VideoUploader: React.FC = () => {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [fileCategory, setFileCategory] = useState<FileCategory>('other');
   const [dragActive, setDragActive] = useState(false);
   const [progressInfo, setProgressInfo] = useState<UploadProgressInfo | null>(null);
   const [uploadedVideo, setUploadedVideo] = useState<VideoMetadata | null>(null);
@@ -68,7 +69,7 @@ export const VideoUploader: React.FC = () => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
       showToast(
         'File Too Large',
-        `Maximum video size is 6 GB. Selected file is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
+        `Maximum video size is 12 GB. Selected file is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
         'error',
         6000
       );
@@ -78,11 +79,19 @@ export const VideoUploader: React.FC = () => {
 
     setSelectedFile(file);
 
-    // Create preview for browser-compatible video types
-    try {
-      const url = URL.createObjectURL(file);
-      setVideoPreviewUrl(url);
-    } catch {
+    const category = getFileTypeMeta(file.name, file.type).category;
+    setFileCategory(category);
+
+    // Only videos and images can be rendered as an actual media preview;
+    // everything else (zip/apk/aab/ipa/docs/...) gets a file-type icon instead.
+    if (category === 'video' || category === 'image') {
+      try {
+        const url = URL.createObjectURL(file);
+        setVideoPreviewUrl(url);
+      } catch {
+        setVideoPreviewUrl(null);
+      }
+    } else {
       setVideoPreviewUrl(null);
     }
   };
@@ -130,15 +139,9 @@ export const VideoUploader: React.FC = () => {
     }
     setSelectedFile(null);
     setVideoPreviewUrl(null);
+    setFileCategory('other');
     setProgressInfo(null);
     setUploaderInstance(null);
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
 
   const watchUrl = uploadedVideo ? qrService.getWatchUrl(uploadedVideo.id) : '';
@@ -242,7 +245,7 @@ export const VideoUploader: React.FC = () => {
               {/* Supported formats & limits */}
               <div className="inline-flex flex-wrap items-center justify-center gap-2 max-w-md mx-auto">
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  Max Size: 6 GB
+                  Max Size: 12 GB
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
                   APK, ZIP, MP4, MKV, Any Format
@@ -256,19 +259,34 @@ export const VideoUploader: React.FC = () => {
             /* Selected File Details & Preview */
             <div className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
               <div className="flex flex-col md:flex-row gap-6 items-start">
-                {/* Video Preview or Icon */}
+                {/* Real Preview (video/image) or File-Type Icon */}
                 <div className="w-full md:w-56 h-36 bg-black rounded-2xl overflow-hidden border border-slate-800 relative flex items-center justify-center shrink-0">
-                  {videoPreviewUrl ? (
+                  {videoPreviewUrl && fileCategory === 'video' ? (
                     <video
                       src={videoPreviewUrl}
                       className="w-full h-full object-contain"
                       controls
                       playsInline
                     />
+                  ) : videoPreviewUrl && fileCategory === 'image' ? (
+                    <img
+                      src={videoPreviewUrl}
+                      alt={selectedFile.name}
+                      className="w-full h-full object-contain"
+                    />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-slate-500 p-4 text-center">
-                      <FileVideo className="w-10 h-10 mb-2 text-indigo-400" />
-                      <span className="text-[11px]">Preview not supported for this codec</span>
+                      {(() => {
+                        const meta = getFileTypeMeta(selectedFile.name, selectedFile.type);
+                        return (
+                          <>
+                            <div className={`w-14 h-14 rounded-2xl ${meta.bg} border ${meta.border} flex items-center justify-center mb-2`}>
+                              <meta.Icon className={`w-7 h-7 ${meta.iconColor}`} />
+                            </div>
+                            <span className="text-[11px]">{meta.label}</span>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -277,7 +295,7 @@ export const VideoUploader: React.FC = () => {
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      Ready to Upload (Max 6 GB)
+                      Ready to Upload (Max 12 GB)
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-white truncate" title={selectedFile.name}>
@@ -290,8 +308,10 @@ export const VideoUploader: React.FC = () => {
                       <span className="font-semibold text-slate-200">{formatFileSize(selectedFile.size)}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block">MIME Type:</span>
-                      <span className="font-semibold text-slate-200 truncate">{selectedFile.type || 'video/*'}</span>
+                      <span className="text-slate-400 block">File Type:</span>
+                      <span className="font-semibold text-slate-200 truncate">
+                        {getFileTypeMeta(selectedFile.name, selectedFile.type).label} ({selectedFile.type || 'unknown'})
+                      </span>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Target Upload Folder:</span>

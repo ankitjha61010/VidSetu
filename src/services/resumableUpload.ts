@@ -1,8 +1,9 @@
 import { googleAuth } from './googleAuth';
 import { driveApi } from './driveApi';
 import { UploadProgressInfo, VideoMetadata, UploadStatus } from '../types';
+import { TransferSpeedTracker } from '../utils/transferSpeed';
 
-export const MAX_FILE_SIZE_BYTES = 6 * 1024 * 1024 * 1024; // 6 GB exactly
+export const MAX_FILE_SIZE_BYTES = 12 * 1024 * 1024 * 1024; // 12 GB exactly
 export const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB chunk size for high performance large file upload
 export const EXPIRATION_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days (72 hours) in milliseconds
 
@@ -20,9 +21,7 @@ export class ResumableUploader {
   private isPaused: boolean = false;
   private isCancelled: boolean = false;
   private currentByte: number = 0;
-  private startTime: number = 0;
-  private lastTime: number = 0;
-  private lastLoaded: number = 0;
+  private speedTracker: TransferSpeedTracker = new TransferSpeedTracker();
   private currentXHR: XMLHttpRequest | null = null;
 
   constructor(options: ResumableUploadOptions) {
@@ -39,7 +38,7 @@ export class ResumableUploader {
     if (this.file.size > MAX_FILE_SIZE_BYTES) {
       return {
         valid: false,
-        error: `Maximum file size is 6 GB. Your file is ${(this.file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
+        error: `Maximum file size is 12 GB. Your file is ${(this.file.size / (1024 * 1024 * 1024)).toFixed(2)} GB.`,
       };
     }
 
@@ -101,9 +100,7 @@ export class ResumableUploader {
     }
 
     this.currentByte = 0;
-    this.startTime = Date.now();
-    this.lastTime = this.startTime;
-    this.lastLoaded = 0;
+    this.speedTracker.reset(0);
 
     return await this.uploadNextChunks();
   }
@@ -264,24 +261,8 @@ export class ResumableUploader {
   }
 
   private updateMetrics(currentLoaded: number) {
-    const now = Date.now();
-    const timeDelta = (now - this.lastTime) / 1000;
-    const totalElapsed = (now - this.startTime) / 1000;
-
-    let speed = 0;
-    if (timeDelta > 0.3) {
-      speed = (currentLoaded - this.lastLoaded) / timeDelta;
-      this.lastTime = now;
-      this.lastLoaded = currentLoaded;
-    } else if (totalElapsed > 0.5 && currentLoaded > 0) {
-      speed = currentLoaded / totalElapsed;
-    }
-
-    const remainingBytes = Math.max(0, this.file.size - currentLoaded);
-    const estimatedSecondsLeft = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
-    const progress = Math.min(100, Math.round((currentLoaded / this.file.size) * 100));
-
-    this.notifyProgress('uploading', progress, currentLoaded, speed, estimatedSecondsLeft);
+    const { percent, speed, etaSeconds } = this.speedTracker.update(currentLoaded, this.file.size);
+    this.notifyProgress('uploading', percent, currentLoaded, speed, etaSeconds);
   }
 
   private calculatePercent(): number {
@@ -323,9 +304,7 @@ export class ResumableUploader {
   public resume(): void {
     if (!this.isPaused) return;
     this.isPaused = false;
-    this.startTime = Date.now();
-    this.lastTime = this.startTime;
-    this.lastLoaded = this.currentByte;
+    this.speedTracker.reset(this.currentByte);
     this.notifyProgress('uploading', this.calculatePercent(), this.currentByte, 0, 0);
   }
 

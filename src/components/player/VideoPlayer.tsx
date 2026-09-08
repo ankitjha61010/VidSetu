@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { VideoMetadata } from '../../types';
 import {
-  ExternalLink,
+  Download,
+  Loader2,
   Sparkles,
 } from 'lucide-react';
 
 interface VideoPlayerProps {
   video: VideoMetadata;
+  onDownload?: () => void;
+  isDownloading?: boolean;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onDownload, isDownloading }) => {
   const [iframeLoaded, setIframeLoaded] = useState<boolean>(false);
 
   const drivePreviewUrl = `https://drive.google.com/file/d/${video.driveFileId}/preview`;
-  const driveDirectViewUrl = `https://drive.google.com/file/d/${video.driveFileId}/view`;
 
   return (
     <div className="w-full space-y-2 select-none">
@@ -48,15 +50,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           <span className="text-slate-300 font-medium">Server Direct Playback Ready</span>
         </div>
 
-        <a
-          href={driveDirectViewUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-        >
-          <span>Open in Google Drive</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
+        {onDownload && (
+          <button
+            onClick={onDownload}
+            disabled={isDownloading}
+            className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-medium transition-colors disabled:opacity-50"
+          >
+            <span>{isDownloading ? 'Downloading...' : 'Download File'}</span>
+            {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+          </button>
+        )}
       </div>
     </div>
   );

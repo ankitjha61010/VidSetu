@@ -5,6 +5,7 @@ import { CopyLinkButton } from '../common/CopyLinkButton';
 import { DownloadButton } from '../common/DownloadButton';
 import { QRModal } from '../common/QRModal';
 import { qrService } from '../../services/qrService';
+import { formatFileSize } from '../../utils/fileType';
 import {
   Play,
   QrCode,
@@ -26,14 +27,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onDelete }) => {
   const [isExpired, setIsExpired] = useState(video.isExpired || Date.now() > video.expiresAt);
 
   const watchUrl = qrService.getWatchUrl(video.id);
-
-  const formatFileSize = (bytes: number): string => {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
 
   const formatDate = (ms: number): string => {
     return new Date(ms).toLocaleDateString(undefined, {

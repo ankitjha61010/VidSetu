@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { driveApi } from '../../services/driveApi';
 import { useToast } from '../../context/ToastContext';
 import { VideoMetadata } from '../../types';
+import { TransferSpeedTracker, formatSpeed } from '../../utils/transferSpeed';
 
 interface DownloadButtonProps {
   video: VideoMetadata;
@@ -19,6 +20,8 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 }) => {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadSpeed, setDownloadSpeed] = useState(0);
+  const speedTrackerRef = useRef(new TransferSpeedTracker());
   const { showToast } = useToast();
 
   const handleDownload = async (e: React.MouseEvent) => {
@@ -32,14 +35,20 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 
     setDownloading(true);
     setDownloadProgress(0);
+    setDownloadSpeed(0);
+    speedTrackerRef.current.reset(0);
     try {
       showToast('Preparing Download', `Fetching "${video.originalFileName || video.name}"...`, 'info', 3000);
 
+      const onStreamProgress = (loaded: number, total: number) => {
+        const { percent, speed } = speedTrackerRef.current.update(loaded, total || video.size);
+        setDownloadProgress(percent);
+        setDownloadSpeed(speed);
+      };
+
       // If file is smaller than 250MB we can download as blob, or trigger direct Drive webContentLink
       if (video.size < 250 * 1024 * 1024) {
-        const blob = await driveApi.getVideoStreamBlob(video.driveFileId, (percent) => {
-          setDownloadProgress(percent);
-        });
+        const blob = await driveApi.getVideoStreamBlob(video.driveFileId, onStreamProgress, video.size);
 
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -50,11 +59,11 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       } else {
-        // Direct stream download link
+        // Direct stream download link - the browser's own download manager handles progress here
         if (video.webContentLink) {
           window.open(video.webContentLink, '_blank');
         } else {
-          const blob = await driveApi.getVideoStreamBlob(video.driveFileId);
+          const blob = await driveApi.getVideoStreamBlob(video.driveFileId, onStreamProgress, video.size);
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -73,6 +82,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     } finally {
       setDownloading(false);
       setDownloadProgress(0);
+      setDownloadSpeed(0);
     }
   };
 
@@ -81,7 +91,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       <button
         onClick={handleDownload}
         disabled={disabled || downloading || video.isExpired}
-        title={downloading ? `Downloading ${downloadProgress}%` : 'Download Video'}
+        title={downloading ? `Downloading ${downloadProgress}% (${formatSpeed(downloadSpeed)})` : 'Download Video'}
         className={`p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         aria-label="Download Video"
       >
@@ -100,7 +110,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         onClick={handleDownload}
         disabled={disabled || downloading || video.isExpired}
         className={`p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-40 ${className}`}
-        title="Download Video"
+        title={downloading ? `Downloading ${downloadProgress}% (${formatSpeed(downloadSpeed)})` : 'Download Video'}
       >
         {downloading ? (
           <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
@@ -120,7 +130,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       {downloading ? (
         <>
           <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-          <span>{downloadProgress > 0 ? `${downloadProgress}%` : 'Downloading...'}</span>
+          <span>{downloadProgress > 0 ? `${downloadProgress}% · ${formatSpeed(downloadSpeed)}` : 'Downloading...'}</span>
         </>
       ) : (
         <>

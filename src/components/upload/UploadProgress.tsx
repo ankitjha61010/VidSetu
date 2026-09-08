@@ -1,5 +1,7 @@
 import React from 'react';
 import { UploadProgressInfo } from '../../types';
+import { formatFileSize } from '../../utils/fileType';
+import { formatSpeed, formatEta } from '../../utils/transferSpeed';
 import { Pause, Play, X, Zap, Clock, HardDrive, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface UploadProgressProps {
@@ -27,28 +29,7 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
     error,
   } = progressInfo;
 
-  const formatSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
-
-  const formatSpeed = (bps: number): string => {
-    if (bps <= 0) return '0 KB/s';
-    const mbps = bps / (1024 * 1024);
-    if (mbps >= 1) return `${mbps.toFixed(1)} MB/s`;
-    return `${(bps / 1024).toFixed(0)} KB/s`;
-  };
-
-  const formatEta = (seconds: number): string => {
-    if (seconds <= 0 || !isFinite(seconds)) return '--';
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
-  };
+  const formatSize = formatFileSize;
 
   const isPaused = status === 'paused';
   const isUploading = status === 'uploading' || status === 'preparing';
