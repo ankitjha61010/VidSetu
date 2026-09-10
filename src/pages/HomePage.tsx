@@ -17,6 +17,7 @@ export const HomePage: React.FC = () => {
   const [trending, setTrending] = useState<MediaItem[]>([]);
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
   const [popularSeries, setPopularSeries] = useState<TVSeries[]>([]);
+  const [classics, setClassics] = useState<Movie[]>([]);
   const [watchlist, setWatchlist] = useState<MediaItem[]>([]);
   const [continueWatching, setContinueWatching] = useState<WatchHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,15 +30,17 @@ export const HomePage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const [trendingRes, moviesRes, seriesRes] = await Promise.all([
+        const [trendingRes, moviesRes, seriesRes, classicsRes] = await Promise.all([
           contentService.getTrending(),
           contentService.getPopularMovies(),
           contentService.getPopularSeries(),
+          contentService.getPublicDomainClassics(),
         ]);
         if (cancelled) return;
         setTrending(trendingRes);
         setPopularMovies(moviesRes);
         setPopularSeries(seriesRes);
+        setClassics(classicsRes);
 
         if (currentSpace) {
           const [watchlistRows, historyRows] = await Promise.all([
@@ -100,6 +103,10 @@ export const HomePage: React.FC = () => {
         <ContinueWatchingRow items={continueWatching} />
       )}
 
+      <MediaRow
+        title="Free Full Movies (Public Domain Classics)"
+        items={classics}
+      />
       <MediaRow title="Trending Now" items={trending.slice(1, 21)} />
       <MediaRow title="Popular Movies" items={popularMovies} />
       <MediaRow title="Popular TV Shows" items={popularSeries} />

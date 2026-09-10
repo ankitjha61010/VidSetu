@@ -1,5 +1,6 @@
 import { tmdbProvider } from './providers/TMDBProvider';
 import { tvMazeProvider } from './providers/TVMazeProvider';
+import { PUBLIC_DOMAIN_CLASSICS } from '../../data/publicDomainClassics';
 import {
   CastMember,
   DiscoverFilters,
@@ -78,6 +79,15 @@ class ContentServiceImpl {
 
   async getCast(id: number, mediaType: 'movie' | 'tv'): Promise<CastMember[]> {
     return tmdbProvider.getCast(id, mediaType);
+  }
+
+  // Real, full public-domain movies that actually play start to finish (see
+  // src/data/publicDomainClassics.ts and InternetArchiveProvider) rather than a trailer.
+  async getPublicDomainClassics(): Promise<Movie[]> {
+    const results = await Promise.all(
+      PUBLIC_DOMAIN_CLASSICS.map((c) => tmdbProvider.getMovieDetails(c.tmdbId).catch(() => null))
+    );
+    return results.filter((m): m is MovieDetails => m !== null);
   }
 }
 

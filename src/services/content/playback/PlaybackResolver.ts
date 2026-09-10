@@ -1,6 +1,7 @@
 import { PLAYBACK_PROVIDERS } from '../config';
 import { trailerPlaybackProvider } from './providers/TrailerPlaybackProvider';
 import { paidStreamingProvider } from './providers/PaidStreamingProvider';
+import { internetArchiveProvider } from './providers/InternetArchiveProvider';
 import { Episode, PlaybackRequest, PlaybackSource, TVSeries, Movie } from '../../../types';
 
 type ResolveFn = (request: PlaybackRequest) => Promise<PlaybackSource | null>;
@@ -9,6 +10,7 @@ type ResolveFn = (request: PlaybackRequest) => Promise<PlaybackSource | null>;
 // VITE_PLAYBACK_PROVIDERS. Add a provider here (and to the env var) to include
 // it in the fallback chain - the UI never needs to know this list exists.
 const PROVIDER_REGISTRY: Record<string, ResolveFn> = {
+  archive: (req) => internetArchiveProvider.resolve(req),
   trailer: (req) => trailerPlaybackProvider.resolve(req),
   paid: (req) => paidStreamingProvider.resolve(req),
 };
