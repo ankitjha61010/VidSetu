@@ -91,7 +91,12 @@ export interface DiscoverFilters {
 
 // --- Playback ---
 
-export type PlaybackProviderName = 'YOUTUBE_TRAILER' | 'PAID_STREAMING' | 'INTERNET_ARCHIVE';
+export type PlaybackProviderName = 'FULL_STREAM' | 'YOUTUBE_TRAILER' | 'PAID_STREAMING' | 'INTERNET_ARCHIVE';
+
+export interface PlaybackServer {
+  name: string;
+  url: string;
+}
 
 export interface PlaybackRequest {
   mediaType: MediaType;
@@ -108,6 +113,7 @@ export interface PlaybackSource {
   season?: number;
   episode?: number;
   isTrailer?: boolean;
+  servers?: PlaybackServer[];
 }
 
 // --- Watch Space domain model (subscription-ready, no limits hard-coded) ---

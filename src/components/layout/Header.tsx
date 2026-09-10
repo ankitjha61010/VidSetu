@@ -40,7 +40,14 @@ export const Header: React.FC = () => {
         {session && (
           <nav className="hidden lg:flex items-center gap-1 flex-shrink-0">
             {NAV_LINKS.map((link) => {
-              const isActive = location.pathname === link.path;
+              const isActive =
+                link.path === '/'
+                  ? location.pathname === '/'
+                  : link.path === '/movies'
+                  ? location.pathname === '/movies' || location.pathname.startsWith('/movie/') || location.pathname.startsWith('/watch/movie/')
+                  : link.path === '/tv-shows'
+                  ? location.pathname === '/tv-shows' || location.pathname.startsWith('/tv/') || location.pathname.startsWith('/watch/tv/')
+                  : location.pathname === link.path;
               return (
                 <Link
                   key={link.path}
@@ -73,7 +80,7 @@ export const Header: React.FC = () => {
         {session ? (
           <div className="flex items-center gap-2 flex-shrink-0">
             {spaces.length > 0 && (
-              <div className="relative hidden sm:block">
+              <div className="relative">
                 <button
                   onClick={() => setShowSpaceMenu((v) => !v)}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800/60 border border-slate-800"

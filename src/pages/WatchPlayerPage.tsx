@@ -7,10 +7,11 @@ import { watchSpaceService } from '../services/watchSpaceService';
 import { useAuth } from '../context/AuthContext';
 import { useWatchSpace } from '../context/WatchSpaceContext';
 import { VideoPlayer } from '../components/player/VideoPlayer';
+import { SeasonEpisodeSelector } from '../components/media/SeasonEpisodeSelector';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import { MediaType, MovieDetails, PlaybackSource, SeriesDetails } from '../types';
+import { Episode, MediaType, MovieDetails, PlaybackSource, SeriesDetails } from '../types';
 
 interface WatchPlayerPageProps {
   mediaType: MediaType;
@@ -30,6 +31,12 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // TV Series episode list state
+  const [series, setSeries] = useState<SeriesDetails | null>(null);
+  const [selectedSeason, setSelectedSeason] = useState<number>(seasonNumber ?? 1);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -47,7 +54,9 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
         } else {
           const details: SeriesDetails = await contentService.getSeriesDetails(tmdbId);
           if (cancelled) return;
+          setSeries(details);
           const s = seasonNumber ?? details.seasons[0]?.seasonNumber ?? 1;
+          setSelectedSeason(s);
           const e = episodeNumber ?? 1;
           setTitle(`${details.title} - S${s}E${e}`);
           resolvedSource = await playbackResolver.resolveEpisode(details, {
@@ -88,10 +97,23 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
     };
   }, [mediaType, tmdbId, seasonNumber, episodeNumber, currentSpace, user]);
 
+  useEffect(() => {
+    if (mediaType !== 'tv' || !series) return;
+    let cancelled = false;
+    setIsLoadingEpisodes(true);
+    contentService
+      .getEpisodes(tmdbId, selectedSeason)
+      .then((res) => !cancelled && setEpisodes(res))
+      .finally(() => !cancelled && setIsLoadingEpisodes(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaType, tmdbId, series, selectedSeason]);
+
   const backHref = mediaType === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="max-w-5xl mx-auto space-y-6">
       <Link to={backHref} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
         <ArrowLeft className="w-4 h-4" />
         Back to Details
@@ -111,7 +133,22 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
           actionText="Back to Details"
         />
       ) : (
-        <VideoPlayer source={source} title={title} />
+        <div className="space-y-8">
+          <VideoPlayer source={source} title={title} />
+
+          {mediaType === 'tv' && series && (
+            <div className="pt-6 border-t border-slate-800">
+              <SeasonEpisodeSelector
+                seriesId={tmdbId}
+                seasons={series.seasons}
+                selectedSeason={selectedSeason}
+                onSelectSeason={setSelectedSeason}
+                episodes={episodes}
+                isLoadingEpisodes={isLoadingEpisodes}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

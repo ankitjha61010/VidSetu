@@ -14,7 +14,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item }) => {
   return (
     <Link
       to={href}
-      className="group flex-shrink-0 w-36 sm:w-44 rounded-2xl overflow-hidden glass-panel-interactive"
+      className="group flex-shrink-0 w-[130px] sm:w-44 rounded-2xl overflow-hidden glass-panel-interactive border border-slate-800/80 shadow-md hover:shadow-indigo-500/10 transition-all"
     >
       <div className="relative w-full aspect-[2/3] bg-slate-900">
         {item.posterUrl ? (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Play, Plus, Check, ArrowLeft, Clock, Calendar, Share2 } from 'lucide-react';
 import { contentService } from '../services/content/ContentService';
 import { watchSpaceService } from '../services/watchSpaceService';
@@ -12,6 +12,7 @@ import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { QRModal } from '../components/common/QRModal';
 import { Movie, MovieDetails } from '../types';
+import { formatRuntime } from '../utils/formatters';
 
 export const MovieDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,12 +21,21 @@ export const MovieDetailsPage: React.FC = () => {
   const { currentSpace } = useWatchSpace();
   const { showToast } = useToast();
 
+  const navigate = useNavigate();
   const [movie, setMovie] = useState<MovieDetails | null>(null);
   const [related, setRelated] = useState<Movie[]>([]);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/movies');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -96,10 +106,10 @@ export const MovieDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+      <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
         <ArrowLeft className="w-4 h-4" />
         Back
-      </Link>
+      </button>
 
       <div className="relative rounded-3xl overflow-hidden border border-slate-800">
         {movie.backdropUrl && (
@@ -123,7 +133,7 @@ export const MovieDetailsPage: React.FC = () => {
               )}
               {movie.runtimeMinutes && (
                 <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" /> {movie.runtimeMinutes} min
+                  <Clock className="w-3.5 h-3.5 text-slate-400" /> {formatRuntime(movie.runtimeMinutes)}
                 </span>
               )}
               <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-semibold border border-amber-500/20">

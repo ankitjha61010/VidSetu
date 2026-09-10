@@ -48,7 +48,7 @@ export const HomePage: React.FC = () => {
             watchSpaceService.listWatchHistory(currentSpace.id),
           ]);
           if (cancelled) return;
-          setContinueWatching(historyRows.slice(0, 10));
+          setContinueWatching(historyRows.slice(0, 15));
 
           const watchlistItems = await Promise.all(
             watchlistRows.slice(0, 20).map((w) =>

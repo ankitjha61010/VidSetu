@@ -18,11 +18,22 @@ export const MobileNavigation: React.FC = () => {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0a0e17]/95 border-t border-slate-800 backdrop-blur-xl px-4 py-2">
+    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0a0e17]/95 border-t border-slate-800/80 backdrop-blur-xl px-4 py-2 select-none shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
       <div className="flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const isActive =
+            item.path === '/'
+              ? location.pathname === '/'
+              : item.path === '/movies'
+              ? location.pathname === '/movies' || location.pathname.startsWith('/movie/') || location.pathname.startsWith('/watch/movie/')
+              : item.path === '/tv-shows'
+              ? location.pathname === '/tv-shows' || location.pathname.startsWith('/tv/') || location.pathname.startsWith('/watch/tv/')
+              : item.path === '/search'
+              ? location.pathname.startsWith('/search')
+              : item.path === '/spaces'
+              ? location.pathname.startsWith('/spaces')
+              : location.pathname === item.path;
 
           if (item.highlight) {
             return (

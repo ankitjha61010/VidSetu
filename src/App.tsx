@@ -29,7 +29,7 @@ export const App: React.FC = () => {
             <div className="min-h-screen flex flex-col bg-[#0a0e17] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
               <Header />
 
-              <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 md:pb-8">
+              <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-32 md:pb-8">
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
 

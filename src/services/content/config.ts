@@ -3,7 +3,7 @@
 
 export const CONTENT_PROVIDER = (import.meta.env.VITE_CONTENT_PROVIDER as string) || 'tmdb';
 
-export const PLAYBACK_PROVIDERS: string[] = ((import.meta.env.VITE_PLAYBACK_PROVIDERS as string) || 'archive,trailer')
+export const PLAYBACK_PROVIDERS: string[] = ((import.meta.env.VITE_PLAYBACK_PROVIDERS as string) || 'stream,archive,trailer')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);

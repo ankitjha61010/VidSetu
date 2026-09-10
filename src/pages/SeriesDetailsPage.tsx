@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Plus, Check, ArrowLeft, Calendar, Layers, Share2 } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Play, Plus, Check, ArrowLeft, Calendar, Layers, Share2 } from 'lucide-react';
 import { contentService } from '../services/content/ContentService';
 import { watchSpaceService } from '../services/watchSpaceService';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +21,7 @@ export const SeriesDetailsPage: React.FC = () => {
   const { currentSpace } = useWatchSpace();
   const { showToast } = useToast();
 
+  const navigate = useNavigate();
   const [series, setSeries] = useState<SeriesDetails | null>(null);
   const [related, setRelated] = useState<TVSeries[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -30,6 +31,14 @@ export const SeriesDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/tv-shows');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -114,10 +123,10 @@ export const SeriesDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+      <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
         <ArrowLeft className="w-4 h-4" />
         Back
-      </Link>
+      </button>
 
       <div className="relative rounded-3xl overflow-hidden border border-slate-800">
         {series.backdropUrl && (
@@ -160,6 +169,13 @@ export const SeriesDetailsPage: React.FC = () => {
             <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">{series.overview}</p>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                to={`/watch/tv/${series.id}/${selectedSeason}/1`}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition-all"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                Play S{selectedSeason} E1
+              </Link>
               <button
                 onClick={toggleWatchlist}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 transition-all"
