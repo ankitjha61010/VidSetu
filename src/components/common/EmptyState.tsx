@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, UploadCloud } from 'lucide-react';
+import { Film, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface EmptyStateProps {
@@ -12,8 +12,8 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  title = 'No videos found',
-  description = 'Upload your first video to Google Drive to share it seamlessly.',
+  title = 'Nothing here yet',
+  description = 'Nothing to show right now.',
   actionHref,
   actionText,
   onAction,
@@ -31,7 +31,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           to={actionHref}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all duration-200"
         >
-          <UploadCloud className="w-4 h-4" />
+          <Plus className="w-4 h-4" />
           {actionText}
         </Link>
       )}
@@ -40,7 +40,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           onClick={onAction}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all duration-200"
         >
-          <UploadCloud className="w-4 h-4" />
+          <Plus className="w-4 h-4" />
           {actionText}
         </button>
       )}

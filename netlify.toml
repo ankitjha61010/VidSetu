@@ -1,13 +1,5 @@
-[functions]
-  directory = "netlify/functions"
-
 [dev]
   targetPort = 3000
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
 
 [[redirects]]
   from = "/ads.txt"

@@ -22,7 +22,7 @@ export const TermsPage: React.FC = () => {
             <span>Legal Agreement</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white">Terms of Service for VidSetu</h1>
-          <p className="text-sm text-slate-400">Last updated: September 6, 2026</p>
+          <p className="text-sm text-slate-400">Last updated: September 10, 2026</p>
         </div>
 
         <div className="space-y-6 text-sm sm:text-base text-slate-300 leading-relaxed">
@@ -34,16 +34,23 @@ export const TermsPage: React.FC = () => {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">2. User Content & Google Drive Storage</h2>
+            <h2 className="text-lg font-bold text-white">2. Content & Playback</h2>
             <p>
-              You retain full ownership of all video files stored in or shared via your personal Google Drive account. You are responsible for ensuring that your content complies with applicable copyright laws and Google's Terms of Service.
+              Movie and TV metadata displayed in VidSetu is provided by The Movie Database (TMDB) and TVmaze and remains the property of its respective rights holders. VidSetu does not host, store, or stream full copyrighted movies or TV episodes; the "Play" action streams the title's official trailer via an embedded YouTube player.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">3. Disclaimer of Warranties</h2>
+            <h2 className="text-lg font-bold text-white">3. Watch Spaces</h2>
             <p>
-              VidSetu is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. VidSetu does not host or store your media files on independent servers.
+              A Watch Space is a personal or shared collection of saved titles and watch history that you create and control. The number of members you can add to a Watch Space is limited by your subscription plan. You are responsible for the members you invite to your Watch Space.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-white">4. Disclaimer of Warranties</h2>
+            <p>
+              VidSetu is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. Metadata accuracy and availability depend on third-party APIs (TMDB, TVmaze, YouTube) outside VidSetu's control.
             </p>
           </section>
         </div>

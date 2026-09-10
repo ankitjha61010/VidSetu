@@ -10,7 +10,7 @@ interface ErrorStateProps {
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
   title = 'Something went wrong',
-  message = 'An unexpected error occurred while communicating with Google Drive.',
+  message = 'An unexpected error occurred.',
   onRetry,
   actionText = 'Try Again',
 }) => {

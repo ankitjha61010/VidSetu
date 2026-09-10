@@ -1,103 +1,76 @@
 # VidSetu (विद्सेतु) 🎥
 
-> **Production-Quality Frontend-Only Video Sharing & Watching Web Application**
-> Powered directly by **Google Drive API v3** & **Google Identity Services OAuth 2.0**, optimized for static hosting on **Netlify**.
+> **Netflix-style movie & TV discovery platform with shared "Watch Spaces"**
+> Metadata from TMDB (+ TVmaze), accounts & Watch Spaces in Supabase, deployable as a static site on Netlify.
 
 ---
 
 ## 🌟 Key Features
 
-1. **Pure Frontend Architecture (Zero Backend / Zero Server)**
-   - No custom backend, Node.js, Express, or database required.
-   - Built with React 18, TypeScript, Tailwind CSS, and Vite.
-   - Deployable directly as a static site to Netlify with full SPA redirect compatibility.
-
-2. **Google Drive Cloud Storage Engine**
-   - Direct integration with Google Drive API v3 via scoped Google OAuth (`https://www.googleapis.com/auth/drive.file`).
-   - Create, list, play, download, and delete videos stored in a designated Google Drive folder (`VidSetu_Videos` or any custom folder selected in Settings).
-   - Zero exposure of Google client secrets in frontend source code.
-
-3. **3 GB Resumable Chunked Upload Engine**
-   - Strictly enforces a **3 GB maximum video size** limit.
-   - Uploads in 4 MB chunks using `Blob.slice()` to prevent browser memory overload.
-   - Real-time percentage, uploaded bytes vs. total bytes, speed calculator (MB/s), estimated time remaining (ETA), pause/resume, and cancel controls.
-   - Automatic exponential backoff retry on network disruptions.
-   - Supports MP4, WebM, MOV, MKV, AVI video formats.
-
-4. **Ephemeral 5-Hour Video Expiration Model**
-   - Embeds creation and expiration timestamps directly in Google Drive file `appProperties`.
-   - Real-time countdown clock in Library and Watch players.
-   - Expired video lockouts: disables playback, downloading, link copying, and QR codes.
-   - Automatic garbage collection / purging whenever an authenticated user opens the app or library.
-
-5. **Pro HTML5 Video Player**
-   - Responsive, dark glassmorphic design.
-   - Custom playback controls (Play/Pause, volume slider, mute, 10s skip, progress scrub bar, fullscreen, Picture-in-Picture).
-   - **Centering Zoom Engine**: 1x, 1.25x, 1.5x, 2x, 2.5x with viewport overflow prevention.
-   - Full touch and keyboard navigation hotkeys (`Space`, `k`, `f`, `m`, `Arrow Left/Right`, `Arrow Up/Down`).
-   - Cross-platform audio support (Desktop Chrome, Safari, Android, iPhone/iPad).
-
-6. **Instant QR Code & Link Sharing**
-   - Generates dynamic QR codes for `https://<YOUR_NETLIFY_DOMAIN>/watch/:videoId`.
-   - Zero tokens or sensitive credentials embedded in generated QR codes or URLs.
-   - One-click copy link with fallback and direct PNG QR download.
+1. **Real movie/TV catalog** — trending, popular, genre browsing, filters (genre/year/sort), and unified search, all powered by [TMDB](https://www.themoviedb.org/) with TVmaze as a supplementary TV metadata source.
+2. **Google sign-in via Supabase Auth** — no custom auth server; Supabase handles the OAuth flow and session.
+3. **Watch Spaces** — a user creates one or more Watch Spaces (owner + members + role + status), each with its own watchlist and watch history. Member limits come from a `subscription_plans` lookup table (`FREE`/`PRO`/`BUSINESS`), never hard-coded, so billing can be layered on later without touching the data model.
+4. **Provider-abstracted architecture** — the UI only talks to `ContentService` (metadata) and `PlaybackResolver` (playback). See `src/services/content/`. Swapping or adding a provider (e.g. a future licensed streaming API) means adding one file + one env var — no UI changes.
+5. **Legal playback today: trailers only.** "Play" streams the official YouTube trailer via TMDB's `/videos` endpoint. Known piracy embed aggregators are intentionally not integrated. A `PaidStreamingProvider` stub is already wired into the fallback chain for when a licensed source is available.
 
 ---
 
 ## 🚀 Quick Start (Local Development)
 
-### 1. Clone & Install Dependencies
+### 1. Install dependencies
 ```bash
-git clone <your-repo-url> vidsetu
-cd vidsetu
 npm install
 ```
 
-### 2. Configure Google OAuth Credentials
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
-2. Create an **OAuth 2.0 Client ID** with Application Type: **Web application**.
-3. Under **Authorized JavaScript Origins**, add:
-   - `http://localhost:3000`
-   - `https://your-site-name.netlify.app` (when deploying to Netlify)
-4. Enable the **Google Drive API** in your Google Cloud Project.
-5. Create a `.env` file in the root directory (or use the Settings page in the UI):
+### 2. Get a TMDB API key
+1. Create an account at [themoviedb.org](https://www.themoviedb.org/) → Settings → API.
+2. Copy the **API Read Access Token** (v4 auth, a long JWT-looking string).
+
+### 3. Create a Supabase project
+1. Create a project at [supabase.com](https://supabase.com).
+2. **Authentication → Providers → Google**: enable it, reusing the Google OAuth Client ID/Secret from Google Cloud Console (Authorized redirect URI: your Supabase project's `https://<project-ref>.supabase.co/auth/v1/callback`).
+3. **SQL Editor**: paste and run `supabase/schema.sql` from this repo. This creates the `profiles`, `subscription_plans`, `watch_spaces`, `watch_space_members`, `watchlist_items`, and `watch_history` tables, all RLS policies, and the profile-on-signup trigger.
+4. **Project Settings → API**: copy the Project URL and `anon` public key.
+
+### 4. Configure environment
+Copy `.env.example` to `.env` and fill in:
 ```env
-VITE_GOOGLE_CLIENT_ID=your_client_id_here.apps.googleusercontent.com
-VITE_DEFAULT_FOLDER_NAME=VidSetu_Videos
+VITE_TMDB_API_KEY=<your TMDB read access token>
+VITE_SUPABASE_URL=<your Supabase project URL>
+VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 ```
 
-### 3. Start Local Dev Server
+### 5. Run
 ```bash
 npm run dev
 ```
-Open `http://localhost:3000` in your browser.
 
 ---
 
 ## 🌐 Deploy to Netlify
 
-### Option A: Deploy via Netlify CLI
 ```bash
 npm install -g netlify-cli
-netlify login
 netlify init
 netlify deploy --prod --dir=dist
 ```
-
-### Option B: Deploy via GitHub / Netlify Web UI
-1. Push this repository to GitHub.
-2. Log in to [Netlify](https://app.netlify.com) and click **Add new site > Import an existing project**.
-3. Configure Build Settings:
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
-4. Set Environment Variables in Netlify (**Site configuration > Environment variables**):
-   - `VITE_GOOGLE_CLIENT_ID` = `your_google_oauth_client_id`
-5. Ensure `netlify.toml` and `public/_redirects` are present (included out of the box) for single-page routing support (`/watch/:videoId` direct links).
+Set the same three env vars above in Netlify's **Site configuration > Environment variables**. `netlify.toml` already configures the SPA redirect (`/* -> /index.html`) needed for client-side routing.
 
 ---
 
-## 🔒 Security Architecture
-- **No Private Credentials**: VidSetu utilizes the Google Identity Services OAuth 2.0 token model for Single Page Apps. Only the public Client ID is used.
-- **Strict Drive Scope**: Requests only `drive.file` scope, giving access only to files uploaded or opened by VidSetu.
-- **Clean Watch URLs**: Route identifiers (`/watch/:videoId`) carry only the Drive file ID.
-- **Static Hosting**: Configured with strict security headers in `netlify.toml`.
+## 🏗️ Architecture
+
+```
+UI (pages/components)
+   -> ContentService        (src/services/content/ContentService.ts)
+        -> TMDBProvider     (primary metadata)
+        -> TVMazeProvider   (supplementary TV metadata)
+   -> PlaybackResolver      (src/services/content/playback/PlaybackResolver.ts)
+        -> TrailerPlaybackProvider  (YouTube trailer via TMDB /videos - active today)
+        -> PaidStreamingProvider    (stub - swap in a licensed provider later)
+   -> watchSpaceService     (src/services/watchSpaceService.ts) -> Supabase (Postgres + RLS)
+```
+
+Replacing the playback source later requires only: implement `PaidStreamingProvider.resolve()` for real, add `paid` to `VITE_PLAYBACK_PROVIDERS`. Nothing in `MovieDetailsPage`, `SeriesDetailsPage`, `WatchPlayerPage`, or `VideoPlayer` needs to change.
+
+See `supabase/schema.sql` for the full Watch Space data model (owner/members/roles/status, subscription-plan-driven `member_limit`, watchlist, watch history) and its RLS policies.

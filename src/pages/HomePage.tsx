@@ -1,120 +1,135 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import {
-  UploadCloud,
-  Film,
-  HardDrive,
-  Shield,
-  Zap,
-  Clock,
-  QrCode,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { contentService } from '../services/content/ContentService';
+import { watchSpaceService } from '../services/watchSpaceService';
+import { useAuth } from '../context/AuthContext';
+import { useWatchSpace } from '../context/WatchSpaceContext';
+import { HeroBanner } from '../components/media/HeroBanner';
+import { MediaRow } from '../components/media/MediaRow';
+import { LoadingState } from '../components/common/LoadingState';
+import { ErrorState } from '../components/common/ErrorState';
+import { Movie, TVSeries, MediaItem, WatchHistoryItem } from '../types';
 
 export const HomePage: React.FC = () => {
-  const features = [
-    {
-      icon: HardDrive,
-      title: 'Direct Cloud Storage',
-      desc: 'All files are stored directly in your personal cloud storage. Zero intermediate servers or custom backends.',
-    },
-    {
-      icon: Zap,
-      title: '12 GB Resumable Uploads',
-      desc: 'Chunked multi-part uploads with pause/resume, speed indicators, network retry, and no JavaScript heap overload.',
-    },
-    {
-      icon: Clock,
-      title: '5-Hour Ephemeral Lifespan',
-      desc: 'Automated 5-hour access expiration model with live countdown timers and client-side cleanup garbage collection.',
-    },
-    {
-      icon: QrCode,
-      title: 'Instant QR Code Sharing',
-      desc: 'One-click QR code generation and direct watch links formatted for static Netlify hosting and clean SPA URLs.',
-    },
-    {
-      icon: Shield,
-      title: 'Privacy & Security',
-      desc: 'No sign-in required for anyone sending or receiving a file - uploads and downloads both run through a locked-down server proxy, never exposing any credentials to the browser.',
-    },
-    {
-      icon: Film,
-      title: 'Pro Video Player',
-      desc: 'Custom responsive video player with 1x-2.5x centering zoom, custom volume/audio, keyboard hotkeys, and PiP.',
-    },
-  ];
+  const { user } = useAuth();
+  const { currentSpace, isLoading: isSpaceLoading, spaces } = useWatchSpace();
+
+  const [trending, setTrending] = useState<MediaItem[]>([]);
+  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
+  const [popularSeries, setPopularSeries] = useState<TVSeries[]>([]);
+  const [watchlist, setWatchlist] = useState<MediaItem[]>([]);
+  const [continueWatching, setContinueWatching] = useState<WatchHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [trendingRes, moviesRes, seriesRes] = await Promise.all([
+          contentService.getTrending(),
+          contentService.getPopularMovies(),
+          contentService.getPopularSeries(),
+        ]);
+        if (cancelled) return;
+        setTrending(trendingRes);
+        setPopularMovies(moviesRes);
+        setPopularSeries(seriesRes);
+
+        if (currentSpace) {
+          const [watchlistRows, historyRows] = await Promise.all([
+            watchSpaceService.listWatchlist(currentSpace.id),
+            watchSpaceService.listWatchHistory(currentSpace.id),
+          ]);
+          if (cancelled) return;
+          setContinueWatching(historyRows.slice(0, 10));
+
+          const watchlistItems = await Promise.all(
+            watchlistRows.slice(0, 20).map((w) =>
+              w.mediaType === 'movie'
+                ? contentService.getMovieDetails(w.tmdbId).catch(() => null)
+                : contentService.getSeriesDetails(w.tmdbId).catch(() => null)
+            )
+          );
+          if (cancelled) return;
+          setWatchlist(watchlistItems.filter(Boolean) as MediaItem[]);
+        }
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Failed to load content.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSpace]);
+
+  if (!isSpaceLoading && user && spaces.length === 0) {
+    return <Navigate to="/spaces" replace />;
+  }
+
+  if (error) {
+    return (
+      <div className="py-12">
+        <ErrorState message={error} onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
+
+  if (isLoading && trending.length === 0) {
+    return (
+      <div className="py-24">
+        <LoadingState message="Loading VidSetu..." subMessage="Fetching trending movies and shows" size="lg" />
+      </div>
+    );
+  }
+
+  const hero = trending[0] ?? null;
 
   return (
-    <div className="space-y-16 pb-12">
-      {/* Hero Section */}
-      <section className="relative pt-8 pb-12 sm:pt-16 sm:pb-20 text-center overflow-hidden">
-        {/* Glow backdrop */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-indigo-600/20 via-sky-500/20 to-purple-600/20 rounded-full blur-3xl pointer-events-none -z-10" />
+    <div className="space-y-10 pb-12">
+      <HeroBanner item={hero} />
 
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 mb-6 animate-pulse-subtle">
-          <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-          Pure Frontend Architecture • High-Speed 12 GB Transfers • Zero Server Storage
-        </div>
+      {continueWatching.length > 0 && (
+        <ContinueWatchingRow items={continueWatching} />
+      )}
 
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1] max-w-4xl mx-auto">
-          Share Large Files & Stream Videos{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-sky-300 to-indigo-200">
-            Privately
-          </span>
-        </h1>
-
-        <p className="mt-6 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Upload up to 12 GB files & videos with resumable chunking, enjoy instant streaming, generate shareable QR links, and maintain private 5-hour lifespans.
-        </p>
-
-        {/* CTA Buttons */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            to="/upload"
-            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white font-bold text-base shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all border border-indigo-400/30"
-          >
-            <UploadCloud className="w-5 h-5" />
-            <span>Upload Files (12 GB)</span>
-          </Link>
-          <Link
-            to="/videos"
-            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-slate-850 hover:bg-slate-800 text-slate-100 font-bold text-base border border-slate-700 hover:border-slate-600 transition-all shadow-lg"
-          >
-            <Film className="w-5 h-5 text-indigo-400" />
-            <span>Movies Library</span>
-          </Link>
-        </div>
-      </section>
-
-      {/* Feature Showcase Grid */}
-      <section className="space-y-6">
-        <div className="text-center max-w-xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            Engineered for Performance & Privacy
-          </h2>
-          <p className="text-sm text-slate-400 mt-2">
-            A comprehensive overview of VidSetu frontend capabilities
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feat, idx) => {
-            const Icon = feat.icon;
-            return (
-              <div
-                key={idx}
-                className="glass-panel p-7 rounded-3xl border border-slate-800 hover:border-indigo-500/40 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 space-y-4 group bg-slate-900/40"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all">
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white group-hover:text-indigo-200 transition-colors">{feat.title}</h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{feat.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <MediaRow title="Trending Now" items={trending.slice(1, 21)} />
+      <MediaRow title="Popular Movies" items={popularMovies} />
+      <MediaRow title="Popular TV Shows" items={popularSeries} />
+      <MediaRow
+        title="My Watchlist"
+        items={watchlist}
+        emptyMessage="Nothing saved yet — add a movie or show from its details page."
+      />
     </div>
   );
+};
+
+const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items }) => {
+  const [resolved, setResolved] = useState<MediaItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      items.map((h) =>
+        h.mediaType === 'movie'
+          ? contentService.getMovieDetails(h.tmdbId).catch(() => null)
+          : contentService.getSeriesDetails(h.tmdbId).catch(() => null)
+      )
+    ).then((results) => {
+      if (!cancelled) setResolved(results.filter(Boolean) as MediaItem[]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
+  return <MediaRow title="Continue Watching" items={resolved} />;
 };

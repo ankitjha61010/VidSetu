@@ -1,14 +1,18 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Film, UploadCloud, Home } from 'lucide-react';
+import { Home, Search, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const MobileNavigation: React.FC = () => {
   const location = useLocation();
+  const { session } = useAuth();
+
+  if (!session) return null;
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Videos', path: '/videos', icon: Film },
-    { name: 'Upload', path: '/upload', icon: UploadCloud, highlight: true },
+    { name: 'Search', path: '/search', icon: Search, highlight: true },
+    { name: 'Spaces', path: '/spaces', icon: Users },
   ];
 
   return (
@@ -20,15 +24,11 @@ export const MobileNavigation: React.FC = () => {
 
           if (item.highlight) {
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className="flex flex-col items-center -mt-5"
-              >
+              <Link key={item.path} to={item.path} className="flex flex-col items-center -mt-5">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/40 transform active:scale-95 transition-transform border-2 border-[#0a0e17]">
                   <Icon className="w-6 h-6" />
                 </div>
-                <span className="text-[10px] font-semibold text-indigo-400 mt-1">Upload</span>
+                <span className="text-[10px] font-semibold text-indigo-400 mt-1">{item.name}</span>
               </Link>
             );
           }

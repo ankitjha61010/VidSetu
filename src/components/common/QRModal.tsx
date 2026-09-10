@@ -7,27 +7,26 @@ import { LoadingState } from './LoadingState';
 interface QRModalProps {
   isOpen: boolean;
   onClose: () => void;
-  videoId: string;
-  videoTitle?: string;
+  url: string;
+  title?: string;
 }
 
 export const QRModal: React.FC<QRModalProps> = ({
   isOpen,
   onClose,
-  videoId,
-  videoTitle,
+  url,
+  title,
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const watchUrl = qrService.getWatchUrl(videoId);
 
   useEffect(() => {
-    if (isOpen && videoId) {
+    if (isOpen && url) {
       setLoading(true);
       qrService
-        .generateQRDataUrl(watchUrl)
-        .then((url) => {
-          setQrDataUrl(url);
+        .generateQRDataUrl(url)
+        .then((dataUrl) => {
+          setQrDataUrl(dataUrl);
           setLoading(false);
         })
         .catch((err) => {
@@ -35,13 +34,13 @@ export const QRModal: React.FC<QRModalProps> = ({
           setLoading(false);
         });
     }
-  }, [isOpen, videoId, watchUrl]);
+  }, [isOpen, url]);
 
   if (!isOpen) return null;
 
   const handleDownloadQR = () => {
     if (qrDataUrl) {
-      qrService.downloadQRImage(qrDataUrl, `vidsetu-qr-${videoId}.png`);
+      qrService.downloadQRImage(qrDataUrl, 'vidsetu-qr.png');
     }
   };
 
@@ -58,9 +57,9 @@ export const QRModal: React.FC<QRModalProps> = ({
               <QrCode className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Scan & Watch</h3>
+              <h3 className="text-lg font-bold text-white">Scan & Share</h3>
               <p className="text-xs text-slate-400 truncate max-w-[240px]">
-                {videoTitle || 'Scan to view on mobile'}
+                {title || 'Scan to open on mobile'}
               </p>
             </div>
           </div>
@@ -90,16 +89,16 @@ export const QRModal: React.FC<QRModalProps> = ({
           )}
 
           <div className="mt-4 text-center px-4">
-            <p className="text-xs text-slate-400 mb-1">Direct Watch Link</p>
+            <p className="text-xs text-slate-400 mb-1">Link</p>
             <p className="text-xs font-mono text-indigo-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 truncate max-w-xs select-all">
-              {watchUrl}
+              {url}
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3 pt-2">
-          <CopyLinkButton url={watchUrl} className="w-full text-xs" />
+          <CopyLinkButton url={url} className="w-full text-xs" />
           <button
             onClick={handleDownloadQR}
             disabled={loading || !qrDataUrl}

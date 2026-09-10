@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { PlaySquare, Home, UploadCloud } from 'lucide-react';
+import { PlaySquare, Home, Film } from 'lucide-react';
 
 export const NotFoundPage: React.FC = () => {
   return (
@@ -26,11 +26,11 @@ export const NotFoundPage: React.FC = () => {
           <span>Back to Home</span>
         </Link>
         <Link
-          to="/upload"
+          to="/videos"
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-colors"
         >
-          <UploadCloud className="w-4 h-4" />
-          <span>Upload Video</span>
+          <Film className="w-4 h-4" />
+          <span>Browse Library</span>
         </Link>
       </div>
     </div>

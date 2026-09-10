@@ -2,14 +2,6 @@ import QRCode from 'qrcode';
 
 export class QRService {
   /**
-   * Generates public Watch URL without exposing any OAuth tokens or private credentials
-   */
-  public getWatchUrl(videoId: string): string {
-    const origin = window.location.origin;
-    return `${origin}/watch/${encodeURIComponent(videoId)}`;
-  }
-
-  /**
    * Generates a Data URL QR Code image
    */
   public async generateQRDataUrl(url: string): Promise<string> {

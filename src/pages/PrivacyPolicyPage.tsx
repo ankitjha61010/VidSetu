@@ -22,7 +22,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             <span>Legal & Privacy</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white">Privacy Policy for VidSetu</h1>
-          <p className="text-sm text-slate-400">Last updated: September 6, 2026</p>
+          <p className="text-sm text-slate-400">Last updated: September 10, 2026</p>
         </div>
 
         <div className="space-y-6 text-sm sm:text-base text-slate-300 leading-relaxed">
@@ -32,27 +32,27 @@ export const PrivacyPolicyPage: React.FC = () => {
               1. Overview & Architecture
             </h2>
             <p>
-              VidSetu ("we", "our", or "the application") is a file sharing and video streaming platform. VidSetu does not own, run, or operate any custom backend database or intermediate media server for file content. All uploaded video and file data is stored exclusively in the operator's Google Drive account, via a small server-side proxy that mediates every upload, download, and library listing.
+              VidSetu ("we", "our", or "the application") is a movie & TV discovery platform. Movie and TV metadata (titles, posters, descriptions, cast, ratings) is sourced from The Movie Database (TMDB) and TVmaze. Trailer playback is provided via embedded YouTube players. VidSetu does not host, store, or stream any copyrighted movie or TV show files itself.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              2. No Account or Sign-In Required
+              2. Account & Sign-In
             </h2>
             <p>
-              VidSetu does not require visitors - whether uploading or downloading a file - to sign in with Google or create any account. We collect no visitor profile, email, or Google identity of any kind. Uploads and downloads are handled entirely by a server-side credential that belongs to the site operator, never to the person using the site.
+              VidSetu requires you to sign in with your Google account (via Supabase Authentication) to create or join a "Watch Space" and save a personal watchlist and watch history. We store your name, email address, and profile picture URL as provided by Google, plus the Watch Space, watchlist, and watch history data you create while using the app.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-400" />
-              3. Data Retention & Third-Party Sharing
+              3. Data Storage & Third Parties
             </h2>
             <p>
-              <strong>We never store, log, track, or share your files, or any personal identifiers, on any external third-party server.</strong> The operator's Google credentials never leave our own server infrastructure and are never sent to, or accessible from, any visitor's browser. Uploaded files are shared "anyone with the link" on Google Drive and are sent solely to and from Google's official Drive API endpoints over HTTPS. Temporary shares are automatically deleted from Drive after download or after their stated expiration window.
+              Account and Watch Space data is stored in Supabase (a hosted PostgreSQL provider), protected by row-level security so only members of a Watch Space can see its contents. Movie/TV metadata requests are sent to TMDB and TVmaze's public APIs. Trailer playback loads an embedded YouTube player, which is subject to YouTube's own privacy practices. We do not sell your data to any third party.
             </p>
           </section>
 
@@ -62,7 +62,7 @@ export const PrivacyPolicyPage: React.FC = () => {
               4. Google API Services User Data Policy Compliance
             </h2>
             <p>
-              VidSetu's use and transfer to any other app of information received from Google APIs adheres to the{' '}
+              VidSetu's use and transfer of information received from Google APIs (via Google Sign-In) adheres to the{' '}
               <a
                 href="https://developers.google.com/terms/api-services-user-data-policy"
                 target="_blank"
@@ -78,8 +78,8 @@ export const PrivacyPolicyPage: React.FC = () => {
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white">5. Contact & Support</h2>
             <p>
-              If you have questions regarding this Privacy Policy or wish to request removal of a file, you may email developer support at{' '}
-              <a href="mailto:abhishek61010@gmail.com" className="text-indigo-400 hover:underline font-semibold">
+              If you have questions regarding this Privacy Policy or wish to request deletion of your account data, you may email developer support at{' '}
+              <a href="mailto:abhikashyap2698@gmail.com" className="text-indigo-400 hover:underline font-semibold">
                 abhikashyap2698@gmail.com
               </a>.
             </p>

@@ -1,52 +1,168 @@
-export interface GoogleUser {
+// --- Auth / Profile ---
+
+export interface Profile {
   id: string;
-  name: string;
   email: string;
-  picture: string;
+  name: string;
+  avatarUrl?: string;
+  createdAt: string;
 }
 
-export interface DriveFolder {
+// --- Content metadata (normalized; UI never sees raw provider shapes) ---
+
+export type MediaType = 'movie' | 'tv';
+
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface MediaBase {
+  id: number; // TMDB id
+  mediaType: MediaType;
+  title: string;
+  overview: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  releaseDate?: string;
+  rating: number; // 0-10
+  genreIds: number[];
+}
+
+export interface Movie extends MediaBase {
+  mediaType: 'movie';
+  runtimeMinutes?: number;
+}
+
+export interface TVSeries extends MediaBase {
+  mediaType: 'tv';
+  numberOfSeasons?: number;
+}
+
+export type MediaItem = Movie | TVSeries;
+
+export interface MovieDetails extends Movie {
+  genres: Genre[];
+  cast: CastMember[];
+  relatedIds: number[];
+}
+
+export interface SeriesDetails extends TVSeries {
+  genres: Genre[];
+  cast: CastMember[];
+  seasons: Season[];
+  relatedIds: number[];
+}
+
+export interface Season {
+  seasonNumber: number;
+  name: string;
+  episodeCount: number;
+  posterUrl?: string;
+  airDate?: string;
+}
+
+export interface Episode {
+  episodeNumber: number;
+  seasonNumber: number;
+  name: string;
+  overview: string;
+  stillUrl?: string;
+  airDate?: string;
+  runtimeMinutes?: number;
+}
+
+export interface CastMember {
+  id: number;
+  name: string;
+  character?: string;
+  photoUrl?: string;
+}
+
+export interface SearchResult extends MediaBase {}
+
+export interface DiscoverFilters {
+  genreId?: number;
+  year?: number;
+  sortBy?: 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'primary_release_date.desc';
+  page?: number;
+}
+
+// --- Playback ---
+
+export type PlaybackProviderName = 'YOUTUBE_TRAILER' | 'PAID_STREAMING' | 'INTERNET_ARCHIVE';
+
+export interface PlaybackRequest {
+  mediaType: MediaType;
+  tmdbId: number;
+  season?: number;
+  episode?: number;
+}
+
+export interface PlaybackSource {
+  provider: PlaybackProviderName;
+  type: 'iframe' | 'video';
+  url: string;
+  contentId: string;
+  season?: number;
+  episode?: number;
+  isTrailer?: boolean;
+}
+
+// --- Watch Space domain model (subscription-ready, no limits hard-coded) ---
+
+export type WatchSpaceRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+export type WatchSpaceMemberStatus = 'ACTIVE' | 'INVITED' | 'REMOVED';
+
+export interface SubscriptionPlan {
   id: string;
   name: string;
+  memberLimit: number;
+  status: string;
 }
 
-export interface VideoMetadata {
-  id: string; // Internal app/watch ID or Drive File ID
-  driveFileId: string;
+export interface WatchSpace {
+  id: string;
   name: string;
-  size: number;
-  mimeType: string;
-  createdAt: number; // timestamp in ms
-  expiresAt: number; // timestamp in ms (createdAt + 5 hours)
-  thumbnailLink?: string;
-  webContentLink?: string;
-  webViewLink?: string;
-  isExpired?: boolean;
-  driveFolderId?: string;
-  originalFileName: string;
-  duration?: number;
+  ownerId: string;
+  subscriptionPlanId?: string | null;
+  memberLimit: number;
+  createdAt: string;
 }
 
-export type UploadStatus = 
-  | 'idle' 
-  | 'preparing' 
-  | 'uploading' 
-  | 'paused' 
-  | 'completed' 
-  | 'failed' 
-  | 'cancelled';
-
-export interface UploadProgressInfo {
-  status: UploadStatus;
-  progress: number; // 0 to 100
-  uploadedBytes: number;
-  totalBytes: number;
-  speed: number; // bytes per second
-  estimatedSecondsLeft: number;
-  error?: string;
-  uploadedFileId?: string;
-  uploadedVideoMeta?: VideoMetadata;
+export interface WatchSpaceMember {
+  watchSpaceId: string;
+  userId: string;
+  role: WatchSpaceRole;
+  status: WatchSpaceMemberStatus;
+  joinedAt: string;
+  createdAt: string;
+  profile?: Profile;
 }
+
+export interface WatchlistItem {
+  id: string;
+  watchSpaceId: string;
+  tmdbId: number;
+  mediaType: MediaType;
+  addedBy: string;
+  addedAt: string;
+}
+
+export interface WatchHistoryItem {
+  id: string;
+  watchSpaceId: string;
+  userId: string;
+  tmdbId: number;
+  mediaType: MediaType;
+  season?: number;
+  episode?: number;
+  progressSeconds: number;
+  durationSeconds: number;
+  lastWatchedAt: string;
+}
+
+// --- UI ---
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -57,5 +173,3 @@ export interface ToastMessage {
   message?: string;
   duration?: number;
 }
-
-export type ZoomLevel = 1 | 1.25 | 1.5 | 2 | 2.5;
