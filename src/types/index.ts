@@ -84,6 +84,7 @@ export interface SearchResult extends MediaBase {}
 export interface DiscoverFilters {
   genreId?: number;
   year?: number;
+  language?: string; // ISO 639-1 original-language code, e.g. 'en', 'hi', 'ta'
   sortBy?: 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'primary_release_date.desc';
   page?: number;
 }

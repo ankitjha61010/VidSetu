@@ -115,6 +115,7 @@ export class TMDBProvider implements ContentProvider {
       tmdbFetch<any>('/discover/movie', {
         with_genres: filters.genreId,
         primary_release_year: filters.year,
+        with_original_language: filters.language,
         sort_by: filters.sortBy || 'popularity.desc',
         page: filters.page || 1,
       })
@@ -128,6 +129,7 @@ export class TMDBProvider implements ContentProvider {
       tmdbFetch<any>('/discover/tv', {
         with_genres: filters.genreId,
         first_air_date_year: filters.year,
+        with_original_language: filters.language,
         sort_by: filters.sortBy || 'popularity.desc',
         page: filters.page || 1,
       })

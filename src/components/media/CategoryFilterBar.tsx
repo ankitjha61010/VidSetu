@@ -13,6 +13,19 @@ const SORT_OPTIONS: { value: NonNullable<DiscoverFilters['sortBy']>; label: stri
   { value: 'primary_release_date.desc', label: 'Newest' },
 ];
 
+const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'en', label: 'Hollywood (English)' },
+  { value: 'hi', label: 'Bollywood (Hindi)' },
+  { value: 'ta', label: 'Tamil' },
+  { value: 'te', label: 'Telugu' },
+  { value: 'pa', label: 'Punjabi' },
+  { value: 'ml', label: 'Malayalam' },
+  { value: 'kn', label: 'Kannada' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'es', label: 'Spanish' },
+];
+
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 15 }, (_, i) => currentYear - i);
 
@@ -46,6 +59,19 @@ export const CategoryFilterBar: React.FC<CategoryFilterBarProps> = ({ genres, fi
       </select>
 
       <select
+        value={filters.language ?? ''}
+        onChange={(e) => onChange({ ...filters, language: e.target.value || undefined })}
+        className="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500/60"
+      >
+        <option value="">All Industries</option>
+        {LANGUAGE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+
+      <select
         value={filters.sortBy ?? 'popularity.desc'}
         onChange={(e) => onChange({ ...filters, sortBy: e.target.value as DiscoverFilters['sortBy'] })}
         className="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500/60"
@@ -57,7 +83,7 @@ export const CategoryFilterBar: React.FC<CategoryFilterBarProps> = ({ genres, fi
         ))}
       </select>
 
-      {(filters.genreId || filters.year || (filters.sortBy && filters.sortBy !== 'popularity.desc')) && (
+      {(filters.genreId || filters.year || filters.language || (filters.sortBy && filters.sortBy !== 'popularity.desc')) && (
         <button
           onClick={() => onChange({ sortBy: 'popularity.desc' })}
           className="px-3 py-2 rounded-xl text-xs sm:text-sm text-indigo-300 hover:text-indigo-200 font-medium"

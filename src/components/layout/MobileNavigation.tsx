@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Users } from 'lucide-react';
+import { Home, Film, Search, Tv, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const MobileNavigation: React.FC = () => {
@@ -11,7 +11,9 @@ export const MobileNavigation: React.FC = () => {
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
+    { name: 'Movies', path: '/movies', icon: Film },
     { name: 'Search', path: '/search', icon: Search, highlight: true },
+    { name: 'TV Shows', path: '/tv-shows', icon: Tv },
     { name: 'Spaces', path: '/spaces', icon: Users },
   ];
 

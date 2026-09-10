@@ -9,6 +9,7 @@ import { MobileNavigation } from './components/layout/MobileNavigation';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { BrowsePage } from './pages/BrowsePage';
 import { SearchPage } from './pages/SearchPage';
 import { MovieDetailsPage } from './pages/MovieDetailsPage';
 import { SeriesDetailsPage } from './pages/SeriesDetailsPage';
@@ -33,6 +34,8 @@ export const App: React.FC = () => {
                   <Route path="/login" element={<LoginPage />} />
 
                   <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+                  <Route path="/movies" element={<ProtectedRoute><BrowsePage mediaType="movie" /></ProtectedRoute>} />
+                  <Route path="/tv-shows" element={<ProtectedRoute><BrowsePage mediaType="tv" /></ProtectedRoute>} />
                   <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
                   <Route path="/movie/:id" element={<ProtectedRoute><MovieDetailsPage /></ProtectedRoute>} />
                   <Route path="/tv/:id" element={<ProtectedRoute><SeriesDetailsPage /></ProtectedRoute>} />

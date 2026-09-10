@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PlaySquare, Search, ChevronDown, LogOut, Users, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
 
+const NAV_LINKS = [
+  { name: 'Home', path: '/' },
+  { name: 'Movies', path: '/movies' },
+  { name: 'TV Shows', path: '/tv-shows' },
+];
+
 export const Header: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, profile, signOut } = useAuth();
   const { spaces, currentSpace, setCurrentSpaceId } = useWatchSpace();
 
@@ -29,6 +36,25 @@ export const Header: React.FC = () => {
           </div>
           <span className="text-lg font-black tracking-tight text-white hidden sm:block">VidSetu</span>
         </Link>
+
+        {session && (
+          <nav className="hidden lg:flex items-center gap-1 flex-shrink-0">
+            {NAV_LINKS.map((link) => {
+              const isActive = location.pathname === link.path;
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {session && (
           <form onSubmit={handleSearch} className="relative flex-1 max-w-md hidden md:block">
