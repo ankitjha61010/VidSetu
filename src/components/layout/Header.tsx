@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { GoogleLogin } from '../auth/GoogleLogin';
 import { PlaySquare, UploadCloud, Film } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -52,11 +51,6 @@ export const Header: React.FC = () => {
             );
           })}
         </nav>
-
-        {/* Auth / Profile section */}
-        <div className="flex items-center gap-3">
-          <GoogleLogin />
-        </div>
       </div>
     </header>
   );

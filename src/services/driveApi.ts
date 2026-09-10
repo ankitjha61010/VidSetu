@@ -1,10 +1,7 @@
-import { googleAuth } from './googleAuth';
-import { DriveFolder, VideoMetadata } from '../types';
+import { VideoMetadata } from '../types';
 import { isVideoFile as isVideoFileType } from '../utils/fileType';
 
 const DRIVE_API_V3 = 'https://www.googleapis.com/drive/v3';
-const STORAGE_KEY_FOLDER = 'vidsetu_active_folder';
-const STORAGE_KEY_UPLOAD_FOLDER = 'vidsetu_active_upload_folder';
 const STORAGE_KEY_LOCAL_METAS = 'vidsetu_local_video_metas';
 
 export const getCentralFolderId = (): string => {
@@ -88,159 +85,37 @@ export async function fetchBlobWithProgress(
   return new Blob(chunks as any, { type: contentType || 'application/octet-stream' });
 }
 
+// Same "wrong runtime" guard as fetchBlobWithProgress above, for our other same-origin Netlify
+// Function endpoints (/api/init-upload, /api/finalize-upload, /api/list-videos, ...): under
+// plain `vite dev` these don't exist, and the request either 404s or - for a GET, since Vite's
+// dev server serves index.html for any unmatched route - silently comes back as the SPA's own
+// HTML with a 200 status. Without this check that HTML would otherwise hit `res.json()` and
+// surface only as a cryptic "Unexpected token '<'" syntax error.
+export async function fetchJson<T = any>(url: string, init: RequestInit = {}, label: string): Promise<T> {
+  const res = await fetch(url, init);
+  const viteDevHint =
+    'If you are running this app with "npm run dev" locally, use "netlify dev" instead (or test on the deployed site) - this endpoint is a Netlify Function and does not exist under plain Vite dev.';
+
+  const contentType = res.headers.get('Content-Type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error(`${label} returned a web page instead of data. ${viteDevHint}`);
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    // A bare 404 with no body from one of our own same-origin /api/ paths is almost always this
+    // same "wrong runtime" cause, just without Vite's HTML fallback body (it only rewrites GET
+    // requests to index.html, so a POST like this one just 404s empty-handed instead).
+    if (res.status === 404 && !detail) {
+      throw new Error(`${label} failed: endpoint not found (HTTP 404). ${viteDevHint}`);
+    }
+    throw new Error(detail || `${label} failed (HTTP ${res.status})`);
+  }
+
+  return res.json();
+}
+
 export class DriveApiService {
-  /**
-   * Helper to perform authenticated Google Drive fetch requests with auto-retry on 401
-   */
-  private async fetchDrive(endpoint: string, options: RequestInit = {}, retryOn401: boolean = true): Promise<Response> {
-    const token = await googleAuth.getValidAccessToken();
-    const headers = new Headers(options.headers || {});
-    headers.set('Authorization', `Bearer ${token}`);
-
-    const res = await fetch(`${DRIVE_API_V3}${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    if (res.status === 401 && retryOn401) {
-      // Token expired or invalidated, clear and prompt login
-      googleAuth.logout();
-      const newToken = await googleAuth.getValidAccessToken();
-      const retryHeaders = new Headers(options.headers || {});
-      retryHeaders.set('Authorization', `Bearer ${newToken}`);
-      return this.fetchDrive(endpoint, { ...options, headers: retryHeaders }, false);
-    }
-
-    if (!res.ok) {
-      let errDetail = '';
-      try {
-        const errJson = await res.json();
-        errDetail = errJson.error?.message || JSON.stringify(errJson);
-      } catch {
-        errDetail = await res.text();
-      }
-      throw new Error(`Drive API Error (${res.status}): ${errDetail || res.statusText}`);
-    }
-
-    return res;
-  }
-
-  /**
-   * Helper to get or create a folder by name
-   */
-  private async getOrCreateFolderByName(folderName: string, storageKey: string): Promise<DriveFolder> {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed?.id) {
-          const folder = await this.getFolderDetails(parsed.id);
-          if (folder) return folder;
-        }
-      } catch (err) {
-        console.warn(`Saved folder for ${folderName} unreachable:`, err);
-      }
-    }
-
-    // Search for existing folders (there may be multiple folders named folderName in Drive)
-    const q = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`);
-    const data = await res.json();
-
-    if (data.files && data.files.length > 0) {
-      const folder: DriveFolder = { id: data.files[0].id, name: data.files[0].name };
-      localStorage.setItem(storageKey, JSON.stringify(folder));
-      return folder;
-    }
-
-    // Create folder
-    const createRes = await this.fetchDrive('/files?supportsAllDrives=true', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        description: `VidSetu ${folderName} storage folder`,
-      }),
-    });
-
-    const newFolder = await createRes.json();
-    const folder: DriveFolder = { id: newFolder.id, name: newFolder.name };
-    localStorage.setItem(storageKey, JSON.stringify(folder));
-    return folder;
-  }
-
-  /**
-   * Get or create library videos folder (VidSetu_Videos or VITE_DEFAULT_FOLDER_NAME)
-   */
-  public async getOrCreateVideosFolder(): Promise<DriveFolder> {
-    const centralFolderId = getCentralFolderId();
-    if (centralFolderId) {
-      const folder: DriveFolder = {
-        id: centralFolderId,
-        name: getVideosFolderName(),
-      };
-      this.saveActiveFolder(folder);
-      return folder;
-    }
-    return this.getOrCreateFolderByName(getVideosFolderName(), STORAGE_KEY_FOLDER);
-  }
-
-  /**
-   * Get or create designated uploads folder (VidSetu_Uploads or VITE_UPLOADS_FOLDER_NAME)
-   */
-  public async getOrCreateUploadFolder(): Promise<DriveFolder> {
-    return this.getOrCreateFolderByName(getUploadsFolderName(), STORAGE_KEY_UPLOAD_FOLDER);
-  }
-
-  /**
-   * Default folder handler for backward compatibility
-   */
-  public async getOrCreateDefaultFolder(): Promise<DriveFolder> {
-    return this.getOrCreateUploadFolder();
-  }
-
-  public async getFolderDetails(folderId: string): Promise<DriveFolder | null> {
-    try {
-      const res = await this.fetchDrive(`/files/${folderId}?fields=id,name,mimeType,trashed&supportsAllDrives=true`);
-      const data = await res.json();
-      if (data.trashed || data.mimeType !== 'application/vnd.google-apps.folder') {
-        return null;
-      }
-      return { id: data.id, name: data.name };
-    } catch {
-      return null;
-    }
-  }
-
-  public getSavedFolder(): DriveFolder | null {
-    const centralFolderId = getCentralFolderId();
-    if (centralFolderId) {
-      return { id: centralFolderId, name: getVideosFolderName() };
-    }
-    const raw = localStorage.getItem(STORAGE_KEY_FOLDER);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  public saveActiveFolder(folder: DriveFolder): void {
-    localStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
-  }
-
-  /**
-   * List folders for the settings selector
-   */
-  public async listUserFolders(): Promise<DriveFolder[]> {
-    const q = `mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await this.fetchDrive(`/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=50&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`);
-    const data = await res.json();
-    return data.files || [];
-  }
-
   /**
    * Helper to check if a Drive file is a movie/video file
    */
@@ -258,165 +133,84 @@ export class DriveApiService {
   }
 
   /**
-   * List videos stored in the VidSetu_Videos folder(s) for the movies library
+   * Maps a raw Drive file resource (from either listVideos or getVideoMetadata) into our
+   * VideoMetadata shape, resolving the temporary-share vs. permanent-library expiration.
    */
-  public async listVideos(folderId?: string, pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
-    const targetFolderName = getVideosFolderName();
-    const centralFolderId = getCentralFolderId();
-    let folderIdsToSearch: string[] = [];
-
-    if (centralFolderId) {
-      // When a central server folder is configured, exclusively query that folder
-      folderIdsToSearch = [centralFolderId];
-    } else {
-      // Otherwise discover VidSetu_Videos folders in user's Drive
-      try {
-        const folderQ = `name = '${targetFolderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-        const folderRes = await this.fetchDrive(
-          `/files?q=${encodeURIComponent(folderQ)}&fields=files(id,name)&spaces=drive`
-        );
-        const folderData = await folderRes.json();
-        if (folderData.files && Array.isArray(folderData.files)) {
-          folderData.files.forEach((f: any) => {
-            if (f.id && !folderIdsToSearch.includes(f.id)) {
-              folderIdsToSearch.push(f.id);
-            }
-          });
-        }
-      } catch (e) {
-        console.warn('[VidSetu] Error searching VidSetu folders:', e);
-      }
-
-      if (folderId && !folderIdsToSearch.includes(folderId)) {
-        folderIdsToSearch.push(folderId);
-      }
-
-      if (folderIdsToSearch.length === 0) {
-        try {
-          const defaultF = await this.getOrCreateVideosFolder();
-          if (defaultF?.id && !folderIdsToSearch.includes(defaultF.id)) {
-            folderIdsToSearch.push(defaultF.id);
-          }
-        } catch (e) {
-          console.warn('[VidSetu] Error getting default folder:', e);
-        }
-      }
-    }
-
-    let collectedFiles: any[] = [];
-    let lastNextPageToken: string | undefined = undefined;
-
-    // Query files from each identified folder
-    for (const fId of folderIdsToSearch) {
-      try {
-        const fileQ = `'${fId}' in parents and trashed = false`;
-        let url = `/files?q=${encodeURIComponent(fileQ)}&fields=nextPageToken,files(id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,videoMediaMetadata,appProperties,properties,parents)&pageSize=100&orderBy=createdTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-        if (pageToken) {
-          url += `&pageToken=${encodeURIComponent(pageToken)}`;
-        }
-        const fileRes = await this.fetchDrive(url);
-        const fileData = await fileRes.json();
-        if (fileData.files && Array.isArray(fileData.files)) {
-          collectedFiles.push(...fileData.files);
-        }
-        if (fileData.nextPageToken) {
-          lastNextPageToken = fileData.nextPageToken;
-        }
-      } catch (err) {
-        console.warn(`[VidSetu] Error fetching files in folder ${fId}:`, err);
-      }
-    }
-
-    // Deduplicate by file ID
-    const uniqueFilesMap = new Map<string, any>();
-    collectedFiles.forEach((file) => {
-      if (file?.id && !uniqueFilesMap.has(file.id)) {
-        uniqueFilesMap.set(file.id, file);
-      }
-    });
-
+  private mapDriveFile(file: any, folderIdHint?: string): VideoMetadata {
+    const appProps = { ...file.appProperties, ...file.properties };
     const localCache = this.getLocalMetadataCache();
+    const fallbackLocal = localCache[file.id] || {};
 
-    // Filter strictly to non-rejected video files
-    const videoFiles = Array.from(uniqueFilesMap.values()).filter((file: any) => this.isVideoFile(file));
+    const hasExplicitExpiration = Boolean(appProps.vidsetu_expires_at || fallbackLocal.expiresAt);
+    const createdAt = parseInt(appProps.vidsetu_created_at || fallbackLocal.createdAt || new Date(file.createdTime || Date.now()).getTime(), 10);
+    const expiresAt = hasExplicitExpiration
+      ? parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt, 10)
+      : (createdAt + 10 * 365 * 24 * 60 * 60 * 1000);
+    const isExpired = hasExplicitExpiration && Date.now() > expiresAt;
 
-    const videos: VideoMetadata[] = videoFiles.map((file: any) => {
-      const appProps = { ...file.appProperties, ...file.properties };
-      const fallbackLocal = localCache[file.id] || {};
-
-      const hasExplicitExpiration = !!appProps.vidsetu_expires_at || !!fallbackLocal.expiresAt;
-      const createdAt = parseInt(appProps.vidsetu_created_at || fallbackLocal.createdAt || new Date(file.createdTime || Date.now()).getTime(), 10);
-      
-      // Permanent library movie (10 years lifespan) unless explicitly uploaded via temporary WeTransfer
-      const expiresAt = hasExplicitExpiration
-        ? parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt, 10)
-        : (createdAt + 10 * 365 * 24 * 60 * 60 * 1000);
-
-      const isExpired = hasExplicitExpiration && Date.now() > expiresAt;
-
-      const meta: VideoMetadata = {
-        id: file.id,
-        driveFileId: file.id,
-        name: file.name,
-        originalFileName: appProps.original_name || file.name,
-        size: parseInt(file.size || '0', 10),
-        mimeType: file.mimeType || 'application/octet-stream',
-        createdAt,
-        expiresAt,
-        isExpired,
-        thumbnailLink: file.thumbnailLink,
-        webContentLink: file.webContentLink,
-        webViewLink: file.webViewLink,
-        driveFolderId: file.parents?.[0] || folderIdsToSearch[0] || '',
-      };
-
-      // Keep cache updated
-      this.cacheVideoMetadata(meta);
-      return meta;
-    });
-
-    return {
-      videos,
-      nextPageToken: lastNextPageToken,
+    const meta: VideoMetadata = {
+      id: file.id,
+      driveFileId: file.id,
+      name: file.name,
+      originalFileName: appProps.original_name || file.name,
+      size: parseInt(file.size || '0', 10),
+      mimeType: file.mimeType || 'application/octet-stream',
+      createdAt,
+      expiresAt,
+      isExpired,
+      thumbnailLink: file.thumbnailLink,
+      webContentLink: file.webContentLink || `https://drive.google.com/uc?export=download&id=${file.id}`,
+      webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
+      driveFolderId: file.parents?.[0] || folderIdHint,
     };
+
+    this.cacheVideoMetadata(meta);
+    return meta;
   }
 
   /**
-   * Get single video metadata by Drive file ID or check expiration (supports public unauthenticated fetching)
+   * List videos stored in the site owner's library folder, via the server-side /api/list-videos
+   * proxy (uses the owner's own Drive credentials) - no sign-in needed by the caller.
+   */
+  public async listVideos(pageToken?: string): Promise<{ videos: VideoMetadata[]; nextPageToken?: string }> {
+    const params = new URLSearchParams();
+    if (pageToken) params.set('pageToken', pageToken);
+
+    const data = await fetchJson<{ files?: any[]; nextPageToken?: string }>(
+      `/api/list-videos${params.toString() ? `?${params.toString()}` : ''}`,
+      {},
+      'Listing the video library'
+    );
+    const files: any[] = data.files || [];
+    const videoFiles = files.filter((file) => this.isVideoFile(file));
+    const videos = videoFiles.map((file) => this.mapDriveFile(file));
+
+    return { videos, nextPageToken: data.nextPageToken };
+  }
+
+  /**
+   * Get single video metadata by Drive file ID or check expiration (public unauthenticated
+   * fetching - works for any recipient, not just the site owner).
    */
   public async getVideoMetadata(fileId: string): Promise<VideoMetadata> {
     let file: any = null;
 
-    // 1. Try authenticated drive fetch if access token is available
-    if (googleAuth.isAuthenticated()) {
+    // 1. Fetch metadata via the public API-key endpoint. Works because uploaded files are
+    // already shared as "anyone with the link can view" - Drive allows reading a public file's
+    // metadata with just an API key, no OAuth required.
+    const apiKey = getGoogleApiKey();
+    if (apiKey) {
       try {
-        const res = await this.fetchDrive(`/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties,parents,trashed`);
-        file = await res.json();
-      } catch (err) {
-        console.warn('Authenticated file metadata fetch fallback to public:', err);
-      }
-    }
-
-    // 2. If not authenticated or failed, fetch metadata via public endpoint or cached metadata.
-    // The local cache is only ever populated on the uploader's own browser (localStorage), so a
-    // recipient opening the link on a different device always misses it - for them we need a
-    // real unauthenticated request. Drive supports that with just an API key (no OAuth) as long
-    // as the file has "anyone with link" reader access, which makeFilePublic() already grants.
-    if (!file || !file.id) {
-      const apiKey = getGoogleApiKey();
-      if (apiKey) {
-        try {
-          const res = await fetch(
-            `${DRIVE_API_V3}/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties,trashed&key=${apiKey}`
-          );
-          if (res.ok) {
-            file = await res.json();
-          } else {
-            console.warn('Public API-key metadata fetch failed:', res.status, await res.text());
-          }
-        } catch (err) {
-          console.warn('Public API-key metadata fetch error:', err);
+        const res = await fetch(
+          `${DRIVE_API_V3}/files/${fileId}?fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties,trashed&key=${apiKey}`
+        );
+        if (res.ok) {
+          file = await res.json();
+        } else {
+          console.warn('Public API-key metadata fetch failed:', res.status, await res.text());
         }
+      } catch (err) {
+        console.warn('Public API-key metadata fetch error:', err);
       }
     }
 
@@ -439,9 +233,9 @@ export class DriveApiService {
           },
         };
       } else {
-        // Last resort: neither an authenticated session, a working API key, nor a local cache
-        // entry could identify this file - fall back to a bare placeholder rather than erroring
-        // out entirely, since the direct download/view links still work without any metadata.
+        // Last resort: neither a working API key nor a local cache entry could identify this
+        // file - fall back to a bare placeholder rather than erroring out entirely, since the
+        // direct download/view links still work without any metadata.
         file = {
           id: fileId,
           name: 'Shared File',
@@ -458,78 +252,15 @@ export class DriveApiService {
       throw new Error('This file has been removed or deleted from Google Drive.');
     }
 
-    const appProps = { ...file.appProperties, ...file.properties };
-    const localCache = this.getLocalMetadataCache();
-    const fallbackLocal = localCache[file.id] || {};
-
-    const hasExplicitExpiration = Boolean(appProps.vidsetu_expires_at || fallbackLocal.expiresAt);
-    const createdAt = parseInt(appProps.vidsetu_created_at || fallbackLocal.createdAt || new Date(file.createdTime || Date.now()).getTime(), 10);
-    const expiresAt = hasExplicitExpiration
-      ? parseInt(appProps.vidsetu_expires_at || fallbackLocal.expiresAt, 10)
-      : (createdAt + 10 * 365 * 24 * 60 * 60 * 1000);
-    const isExpired = hasExplicitExpiration && Date.now() > expiresAt;
-
-    const meta: VideoMetadata = {
-      id: file.id,
-      driveFileId: file.id,
-      name: file.name,
-      originalFileName: appProps.original_name || file.name,
-      size: parseInt(file.size || '0', 10),
-      mimeType: file.mimeType,
-      createdAt,
-      expiresAt,
-      isExpired,
-      thumbnailLink: file.thumbnailLink,
-      webContentLink: file.webContentLink || `https://drive.google.com/uc?export=download&id=${file.id}`,
-      webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
-      driveFolderId: file.parents?.[0],
-    };
-
-    this.cacheVideoMetadata(meta);
-    return meta;
+    return this.mapDriveFile(file);
   }
 
   /**
-   * Make a file accessible by anyone with the link (reader role)
-   */
-  public async makeFilePublic(fileId: string): Promise<void> {
-    try {
-      await this.fetchDrive(`/files/${fileId}/permissions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role: 'reader',
-          type: 'anyone',
-        }),
-      });
-    } catch (err) {
-      console.warn('Could not set anyone-with-link public permission:', err);
-    }
-  }
-
-  /**
-   * Delete a video file from Google Drive permanently or move to trash
-   */
-  public async deleteVideo(fileId: string, permanent: boolean = true): Promise<void> {
-    if (permanent) {
-      await this.fetchDrive(`/files/${fileId}`, { method: 'DELETE' });
-    } else {
-      await this.fetchDrive(`/files/${fileId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trashed: true }),
-      });
-    }
-
-    // Remove from local cache
-    this.removeCachedMetadata(fileId);
-  }
-
-  /**
-   * Consume a one-time temporary share link: ask the server (which holds a service-account
-   * credential) to delete the file from Drive. Unlike deleteVideo(), this works even when the
-   * caller is an anonymous recipient with no Google session of their own - the recipient only
-   * ever has public "reader" access, which can view/download a file but can never delete it.
+   * Consume a one-time temporary share link: ask the server (which holds the site owner's own
+   * Drive credentials) to delete the file from Drive. Works for anonymous recipients (no Google
+   * session of their own) since it's the server doing the deleting, not the caller's browser.
+   * Also reused to clean up any expired library file, since the server only ever allows deleting
+   * files explicitly marked as temporary shares (see netlify/functions/consume-download.ts).
    */
   public async consumeTemporaryDownload(fileId: string): Promise<void> {
     try {
@@ -548,23 +279,6 @@ export class DriveApiService {
     }
 
     this.removeCachedMetadata(fileId);
-  }
-
-  /**
-   * Fetch a streamable/downloadable direct media blob or range URL
-   */
-  public async getVideoStreamBlob(
-    fileId: string,
-    onProgress?: (loadedBytes: number, totalBytes: number) => void,
-    expectedSize?: number
-  ): Promise<Blob> {
-    const token = await googleAuth.getValidAccessToken();
-    return fetchBlobWithProgress(
-      `${DRIVE_API_V3}/files/${fileId}?alt=media`,
-      { headers: { Authorization: `Bearer ${token}` } },
-      onProgress,
-      expectedSize
-    );
   }
 
   /**

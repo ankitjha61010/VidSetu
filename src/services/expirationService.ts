@@ -1,5 +1,4 @@
 import { driveApi } from './driveApi';
-import { googleAuth } from './googleAuth';
 import { VideoMetadata } from '../types';
 
 export const EXPIRATION_HOURS = 72; // 3 Days (72 hours)
@@ -55,13 +54,12 @@ export class ExpirationService {
   }
 
   /**
-   * Run background cleanup for expired files when user is active with Google auth
+   * Background cleanup for expired temporary shares. Goes through the same server-side
+   * /api/consume-download endpoint the download flow uses, so it works with no sign-in - and
+   * for the same reason that endpoint is safe to expose publicly, this is too: the server only
+   * ever deletes files explicitly marked as temporary shares, never a permanent library upload.
    */
   public async purgeExpiredVideos(videos?: VideoMetadata[]): Promise<{ purgedCount: number }> {
-    if (!googleAuth.isAuthenticated()) {
-      return { purgedCount: 0 };
-    }
-
     try {
       const listToCheck = videos || (await driveApi.listVideos()).videos;
       const now = Date.now();
@@ -71,8 +69,7 @@ export class ExpirationService {
       let purgedCount = 0;
       for (const vid of expired) {
         try {
-          // Permanently delete file from Google Drive after 3 days
-          await driveApi.deleteVideo(vid.driveFileId, true);
+          await driveApi.consumeTemporaryDownload(vid.driveFileId);
           purgedCount++;
         } catch (e) {
           console.warn(`Could not purge expired file ${vid.name}:`, e);

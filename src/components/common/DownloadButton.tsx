@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { driveApi, isTemporaryUpload, getDirectDownloadUrl, fetchBlobWithProgress } from '../../services/driveApi';
-import { googleAuth } from '../../services/googleAuth';
 import { useToast } from '../../context/ToastContext';
 import { VideoMetadata } from '../../types';
 import { TransferSpeedTracker, formatSpeed, formatEta } from '../../utils/transferSpeed';
@@ -50,45 +49,28 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         setDownloadEta(etaSeconds);
       };
 
-      // The signed-in owner can stream via the authenticated Drive API (small files) to get live
-      // progress. Everyone else - including anonymous link recipients, who only ever have public
-      // "reader" access and no Google session of their own - downloads through our own
-      // /api/download-file proxy instead of a drive.google.com link: on mobile, drive.google.com
-      // is a verified Android App Link, so navigating there gets intercepted into a Google
-      // account-picker prompt instead of just saving the file to the device.
-      const canUseAuthenticatedBlob = video.size < 250 * 1024 * 1024 && googleAuth.isAuthenticated();
-
-      if (canUseAuthenticatedBlob) {
-        const blob = await driveApi.getVideoStreamBlob(video.driveFileId, onStreamProgress, video.size);
-
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = video.originalFileName || video.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      } else {
-        // Fetched (rather than a plain <a> navigation) so a broken/misrouted proxy response -
-        // e.g. running under plain "vite dev", which has no Netlify Functions and falls back to
-        // serving the SPA's own index.html - is caught here and surfaced as an error, instead of
-        // silently being saved to disk as if it were the real file.
-        const blob = await fetchBlobWithProgress(
-          getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
-          {},
-          onStreamProgress,
-          video.size
-        );
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = video.originalFileName || video.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }
+      // Everyone - including anonymous link recipients, who have no Google session of their own
+      // - downloads through our own /api/download-file proxy instead of a drive.google.com link:
+      // on mobile, drive.google.com is a verified Android App Link, so navigating there gets
+      // intercepted into a Google account-picker prompt instead of just saving the file.
+      // Fetched (rather than a plain <a> navigation) so a broken/misrouted proxy response - e.g.
+      // running under plain "vite dev", which has no Netlify Functions and falls back to serving
+      // the SPA's own index.html - is caught here and surfaced as an error, instead of silently
+      // being saved to disk as if it were the real file.
+      const blob = await fetchBlobWithProgress(
+        getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
+        {},
+        onStreamProgress,
+        video.size
+      );
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = video.originalFileName || video.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
 
       // One-time link security: once a temporary share has been downloaded, remove it from Drive
       // immediately instead of leaving it to sit there until the uploader happens to purge it.

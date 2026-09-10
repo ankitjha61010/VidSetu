@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { useDrive } from '../../context/DriveContext';
 import { useToast } from '../../context/ToastContext';
 import { ResumableUploader, MAX_FILE_SIZE_BYTES } from '../../services/resumableUpload';
@@ -17,8 +16,7 @@ import {
 } from 'lucide-react';
 
 export const VideoUploader: React.FC = () => {
-  const { isAuthenticated, login } = useAuth();
-  const { activeFolder, uploadFolder, fetchVideos } = useDrive();
+  const { fetchVideos } = useDrive();
   const { showToast } = useToast();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -99,18 +97,8 @@ export const VideoUploader: React.FC = () => {
   const startUpload = async () => {
     if (!selectedFile) return;
 
-    if (!isAuthenticated) {
-      showToast('Authentication Required', 'Please connect with Google to upload videos.', 'warning');
-      try {
-        await login();
-      } catch {
-        return;
-      }
-    }
-
     const uploader = new ResumableUploader({
       file: selectedFile,
-      folderId: uploadFolder?.id || activeFolder?.id,
       onProgress: (info) => {
         setProgressInfo(info);
       },
@@ -252,7 +240,7 @@ export const VideoUploader: React.FC = () => {
                   APK, ZIP, MP4, MKV, Any Format
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-slate-300 border border-slate-700">
-                  Folder: {uploadFolder?.name || 'VidSetu_Uploads'}
+                  Folder: VidSetu_Uploads
                 </span>
               </div>
             </div>
@@ -317,7 +305,7 @@ export const VideoUploader: React.FC = () => {
                     <div className="min-w-0">
                       <span className="text-slate-400 block">Target Upload Folder:</span>
                       <span className="font-semibold text-indigo-300 truncate block">
-                        {uploadFolder?.name || 'VidSetu_Uploads'}
+                        VidSetu_Uploads
                       </span>
                     </div>
                     <div className="min-w-0">

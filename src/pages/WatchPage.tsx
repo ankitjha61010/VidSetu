@@ -4,7 +4,6 @@ import { driveApi, isTemporaryUpload, getDirectDownloadUrl, fetchBlobWithProgres
 import { useToast } from '../context/ToastContext';
 import { expirationService } from '../services/expirationService';
 import { qrService } from '../services/qrService';
-import { googleAuth } from '../services/googleAuth';
 import { VideoPlayer } from '../components/player/VideoPlayer';
 import { ExpiredVideo } from '../components/player/ExpiredVideo';
 import { LoadingState } from '../components/common/LoadingState';
@@ -122,64 +121,32 @@ export const WatchPage: React.FC = () => {
       setDownloadSpeed(0);
       setDownloadEta(0);
       speedTrackerRef.current.reset(0);
-      let downloaded = false;
 
-      // 1. If user is already authenticated in this session, use authorized Google Drive API stream
-      //    with live progress reporting so the user can see percent/speed instead of a static spinner.
-      if (googleAuth.isAuthenticated()) {
-        try {
-          const blob = await driveApi.getVideoStreamBlob(
-            video.driveFileId,
-            (loaded, total) => {
-              const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
-              setDownloadProgress(percent);
-              setDownloadSpeed(speed);
-              setDownloadEta(etaSeconds);
-            },
-            video.size
-          );
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = video.originalFileName || video.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-          downloaded = true;
-        } catch (err) {
-          console.warn('Authenticated blob download fallback:', err);
-        }
-      }
-
-      // 2. Direct public download for unauthenticated recipients, routed through our own
-      // /api/download-file proxy rather than drive.google.com directly - drive.google.com is a
-      // verified Android App Link, so a raw navigation there gets intercepted into a Google
-      // account-picker prompt instead of just downloading the file. Fetched (rather than a plain
-      // <a> navigation) so a broken/misrouted proxy response is caught here and surfaced as an
-      // error instead of silently being saved as if it were the real file.
-      if (!downloaded) {
-        const blob = await fetchBlobWithProgress(
-          getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
-          {},
-          (loaded, total) => {
-            const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
-            setDownloadProgress(percent);
-            setDownloadSpeed(speed);
-            setDownloadEta(etaSeconds);
-          },
-          video.size
-        );
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = video.originalFileName || video.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        downloaded = true;
-      }
+      // Public download, routed through our own /api/download-file proxy rather than
+      // drive.google.com directly - drive.google.com is a verified Android App Link, so a raw
+      // navigation there gets intercepted into a Google account-picker prompt instead of just
+      // downloading the file. Fetched (rather than a plain <a> navigation) so a broken/misrouted
+      // proxy response is caught here and surfaced as an error instead of silently being saved
+      // as if it were the real file. Works for anyone with the link - no sign-in required.
+      const blob = await fetchBlobWithProgress(
+        getDirectDownloadUrl(video.driveFileId, video.originalFileName || video.name),
+        {},
+        (loaded, total) => {
+          const { percent, speed, etaSeconds } = speedTrackerRef.current.update(loaded, total || video.size);
+          setDownloadProgress(percent);
+          setDownloadSpeed(speed);
+          setDownloadEta(etaSeconds);
+        },
+        video.size
+      );
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = video.originalFileName || video.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
       // 3. One-time link security: Delete file from Drive if it's a temporary upload, expire link, and show used state.
       // Recipients only ever hold public "reader" access and have no Drive credentials of their

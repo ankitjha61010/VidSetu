@@ -32,23 +32,18 @@ export const PrivacyPolicyPage: React.FC = () => {
               1. Overview & Architecture
             </h2>
             <p>
-              VidSetu ("we", "our", or "the application") is a <strong>client-side, frontend-only video streaming and sharing platform</strong>. VidSetu does not own, run, or operate any custom backend database or intermediate media server. All user video data is stored exclusively in the user's personal Google Drive account.
+              VidSetu ("we", "our", or "the application") is a file sharing and video streaming platform. VidSetu does not own, run, or operate any custom backend database or intermediate media server for file content. All uploaded video and file data is stored exclusively in the operator's Google Drive account, via a small server-side proxy that mediates every upload, download, and library listing.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              2. Google User Data & OAuth Permissions
+              2. No Account or Sign-In Required
             </h2>
             <p>
-              VidSetu uses Google OAuth 2.0 to request access to the user's Google Drive. We strictly use these permissions for:
+              VidSetu does not require visitors - whether uploading or downloading a file - to sign in with Google or create any account. We collect no visitor profile, email, or Google identity of any kind. Uploads and downloads are handled entirely by a server-side credential that belongs to the site operator, never to the person using the site.
             </p>
-            <ul className="list-disc list-inside space-y-1 pl-2 text-slate-300">
-              <li>Reading and streaming movie and video files stored in your selected Google Drive folders (<code className="text-indigo-300 bg-slate-800 px-1 py-0.5 rounded">VidSetu_Videos</code> and <code className="text-indigo-300 bg-slate-800 px-1 py-0.5 rounded">VidSetu_Uploads</code>).</li>
-              <li>Uploading user-selected video files directly from your browser to your Google Drive via resumable upload streams.</li>
-              <li>Displaying your account profile name and avatar to verify your connection status.</li>
-            </ul>
           </section>
 
           <section className="space-y-3">
@@ -57,7 +52,7 @@ export const PrivacyPolicyPage: React.FC = () => {
               3. Data Retention & Third-Party Sharing
             </h2>
             <p>
-              <strong>We never store, log, track, or share your videos, OAuth access tokens, or personal identifiers on any external third-party server.</strong> Your Google OAuth tokens remain strictly inside your browser's local storage session (<code className="text-slate-200">sessionStorage</code> / <code className="text-slate-200">localStorage</code>) and are sent solely to Google's official Drive API endpoints over HTTPS.
+              <strong>We never store, log, track, or share your files, or any personal identifiers, on any external third-party server.</strong> The operator's Google credentials never leave our own server infrastructure and are never sent to, or accessible from, any visitor's browser. Uploaded files are shared "anyone with the link" on Google Drive and are sent solely to and from Google's official Drive API endpoints over HTTPS. Temporary shares are automatically deleted from Drive after download or after their stated expiration window.
             </p>
           </section>
 
@@ -83,7 +78,7 @@ export const PrivacyPolicyPage: React.FC = () => {
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white">5. Contact & Support</h2>
             <p>
-              If you have questions regarding this Privacy Policy or wish to revoke access, you may disconnect your Google Account at any time via the application header or by emailing developer support at{' '}
+              If you have questions regarding this Privacy Policy or wish to request removal of a file, you may email developer support at{' '}
               <a href="mailto:abhishek61010@gmail.com" className="text-indigo-400 hover:underline font-semibold">
                 abhikashyap2698@gmail.com
               </a>.

@@ -1,5 +1,4 @@
-import { googleAuth } from './googleAuth';
-import { driveApi } from './driveApi';
+import { driveApi, fetchJson } from './driveApi';
 import { UploadProgressInfo, VideoMetadata, UploadStatus } from '../types';
 import { TransferSpeedTracker } from '../utils/transferSpeed';
 
@@ -9,13 +8,11 @@ export const EXPIRATION_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 Days (72 hou
 
 export interface ResumableUploadOptions {
   file: File;
-  folderId?: string;
   onProgress?: (progress: UploadProgressInfo) => void;
 }
 
 export class ResumableUploader {
   private file: File;
-  private folderId?: string;
   private onProgress?: (progress: UploadProgressInfo) => void;
   private uploadUrl: string | null = null;
   private isPaused: boolean = false;
@@ -26,7 +23,6 @@ export class ResumableUploader {
 
   constructor(options: ResumableUploadOptions) {
     this.file = options.file;
-    this.folderId = options.folderId;
     this.onProgress = options.onProgress;
   }
 
@@ -56,54 +52,28 @@ export class ResumableUploader {
     this.isPaused = false;
     this.notifyProgress('preparing', 0, 0, 0, 0);
 
-    // Step 1: Initialize Resumable Session with Drive
-    const token = await googleAuth.getValidAccessToken();
-    const folder = this.folderId || (await driveApi.getOrCreateDefaultFolder()).id;
-
-    const createdAt = Date.now();
-    const expiresAt = createdAt + EXPIRATION_DURATION_MS;
-
-    const metadata = {
-      name: this.file.name,
-      mimeType: this.file.type || 'application/octet-stream',
-      parents: folder ? [folder] : [],
-      description: `Uploaded via VidSetu. Expires at ${new Date(expiresAt).toISOString()}`,
-      // Stored under `properties` (visible to all apps) rather than `appProperties` (private to
-      // the requesting app) because Drive refuses to return appProperties on an unauthenticated,
-      // API-key-only request - which is exactly how anonymous link recipients fetch metadata. If
-      // this lived only in appProperties, isTemporaryUpload() would read it as absent for them
-      // and skip deleting the file after their download.
-      properties: {
-        vidsetu_created_at: createdAt.toString(),
-        vidsetu_expires_at: expiresAt.toString(),
-        original_name: this.file.name,
-      },
-    };
-
-    const sessionRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,mimeType,createdTime,thumbnailLink,webContentLink,webViewLink,properties,appProperties',
+    // Step 1: Ask our server to open a resumable session with Drive using the site owner's own
+    // credentials - the person uploading never needs a Google account of their own. The session
+    // URL it hands back is itself the authorization for the chunk PUTs that follow, so the file
+    // bytes go straight from this browser to Drive without passing through our server.
+    const { uploadUrl } = await fetchJson<{ uploadUrl?: string }>(
+      '/api/init-upload',
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': this.file.type || 'application/octet-stream',
-          'X-Upload-Content-Length': this.file.size.toString(),
-        },
-        body: JSON.stringify(metadata),
-      }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: this.file.name,
+          mimeType: this.file.type || 'application/octet-stream',
+          fileSize: this.file.size,
+        }),
+      },
+      'Starting the upload'
     );
-
-    if (!sessionRes.ok) {
-      const err = await sessionRes.text();
-      throw new Error(`Failed to initiate Google Drive upload session: ${err}`);
+    if (!uploadUrl) {
+      throw new Error('Server did not return a valid resumable upload URL.');
     }
 
-    this.uploadUrl = sessionRes.headers.get('Location');
-    if (!this.uploadUrl) {
-      throw new Error('Google Drive did not return a valid resumable upload location header.');
-    }
-
+    this.uploadUrl = uploadUrl;
     this.currentByte = 0;
     this.speedTracker.reset(0);
 
@@ -158,8 +128,17 @@ export class ResumableUploader {
             this.currentByte = this.file.size;
             this.notifyProgress('completed', 100, this.file.size, 0, 0, undefined, fileData.id);
 
-            // Set public sharing link permission so recipient can watch/download without signing in
-            await driveApi.makeFilePublic(fileData.id);
+            // Set public sharing link permission (server-side, using the owner's own credentials)
+            // so the recipient can watch/download without signing in themselves.
+            await fetchJson(
+              '/api/finalize-upload',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileId: fileData.id }),
+              },
+              'Making the upload shareable'
+            );
 
             const videoMeta: VideoMetadata = {
               id: fileData.id,
@@ -174,7 +153,7 @@ export class ResumableUploader {
               thumbnailLink: fileData.thumbnailLink,
               webContentLink: fileData.webContentLink,
               webViewLink: fileData.webViewLink,
-              driveFolderId: this.folderId,
+              driveFolderId: fileData.parents?.[0],
             };
 
             driveApi.cacheVideoMetadata(videoMeta);

@@ -1,12 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { driveApi } from '../services/driveApi';
 import { expirationService } from '../services/expirationService';
-import { useAuth } from './AuthContext';
-import { DriveFolder, VideoMetadata } from '../types';
+import { VideoMetadata } from '../types';
 
 interface DriveContextType {
-  activeFolder: DriveFolder | null;
-  uploadFolder: DriveFolder | null;
   videos: VideoMetadata[];
   isLoading: boolean;
   isPurging: boolean;
@@ -14,79 +11,24 @@ interface DriveContextType {
   error: string | null;
   fetchVideos: (refresh?: boolean) => Promise<void>;
   loadMoreVideos: () => Promise<void>;
-  selectFolder: (folder: DriveFolder) => void;
-  selectUploadFolder: (folder: DriveFolder) => void;
   deleteVideo: (fileId: string) => Promise<void>;
   purgeExpired: () => Promise<number>;
-  setFolderManually: (folderId: string, folderName?: string) => Promise<void>;
 }
 
 const DriveContext = createContext<DriveContextType | undefined>(undefined);
 
 export const DriveProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  const [activeFolder, setActiveFolder] = useState<DriveFolder | null>(driveApi.getSavedFolder());
-  const [uploadFolder, setUploadFolder] = useState<DriveFolder | null>(null);
   const [videos, setVideos] = useState<VideoMetadata[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPurging, setIsPurging] = useState<boolean>(false);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize Folder on Auth
-  useEffect(() => {
-    if (isAuthenticated) {
-      const initFolderAndVideos = async () => {
-        setIsLoading(true);
-        try {
-          // VidSetu_Videos for video library
-          const videosFolder = await driveApi.getOrCreateVideosFolder();
-          setActiveFolder(videosFolder);
-
-          // VidSetu_Uploads for uploading new files
-          const uFolder = await driveApi.getOrCreateUploadFolder();
-          setUploadFolder(uFolder);
-
-          const result = await driveApi.listVideos(videosFolder.id);
-          setVideos(result.videos);
-          setNextPageToken(result.nextPageToken);
-
-          // Auto-purge expired videos in background
-          expirationService.purgeExpiredVideos(result.videos).catch(() => {});
-        } catch (err: any) {
-          console.error('Failed to init drive folders:', err);
-          setError(err.message || 'Unable to load Google Drive folder.');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      initFolderAndVideos();
-    } else {
-      setVideos([]);
-    }
-  }, [isAuthenticated]);
-
-  // Periodic expiration cleaner every 60 seconds while open
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const interval = setInterval(() => {
-      setVideos((current) => {
-        const now = Date.now();
-        return current.map((v) => ({
-          ...v,
-          isExpired: v.expiresAt ? now > v.expiresAt : false,
-        }));
-      });
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
-
   const fetchVideos = useCallback(async (refresh: boolean = true) => {
-    if (!isAuthenticated) return;
     if (refresh) setIsLoading(true);
     setError(null);
     try {
-      const result = await driveApi.listVideos(activeFolder?.id);
+      const result = await driveApi.listVideos();
       setVideos(result.videos);
       setNextPageToken(result.nextPageToken);
       // Background purge
@@ -97,12 +39,32 @@ export const DriveProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     } finally {
       if (refresh) setIsLoading(false);
     }
-  }, [isAuthenticated, activeFolder]);
+  }, []);
+
+  // Initial library load
+  useEffect(() => {
+    fetchVideos(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Periodic expiration cleaner every 15 seconds while open
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVideos((current) => {
+        const now = Date.now();
+        return current.map((v) => ({
+          ...v,
+          isExpired: v.expiresAt ? now > v.expiresAt : false,
+        }));
+      });
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadMoreVideos = async () => {
-    if (!isAuthenticated || !nextPageToken || isLoading) return;
+    if (!nextPageToken || isLoading) return;
     try {
-      const result = await driveApi.listVideos(activeFolder?.id, nextPageToken);
+      const result = await driveApi.listVideos(nextPageToken);
       setVideos((prev) => [...prev, ...result.videos]);
       setNextPageToken(result.nextPageToken);
     } catch (err: any) {
@@ -111,28 +73,8 @@ export const DriveProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  const selectFolder = (folder: DriveFolder) => {
-    driveApi.saveActiveFolder(folder);
-    setActiveFolder(folder);
-    fetchVideos(true);
-  };
-
-  const selectUploadFolder = (folder: DriveFolder) => {
-    setUploadFolder(folder);
-    localStorage.setItem('vidsetu_active_upload_folder', JSON.stringify(folder));
-  };
-
-  const setFolderManually = async (folderId: string, folderName?: string) => {
-    const details = await driveApi.getFolderDetails(folderId);
-    const folder: DriveFolder = {
-      id: folderId,
-      name: folderName || details?.name || 'Custom Folder',
-    };
-    selectFolder(folder);
-  };
-
   const deleteVideo = async (fileId: string) => {
-    await driveApi.deleteVideo(fileId);
+    await driveApi.consumeTemporaryDownload(fileId);
     setVideos((prev) => prev.filter((v) => v.id !== fileId && v.driveFileId !== fileId));
   };
 
@@ -152,8 +94,6 @@ export const DriveProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <DriveContext.Provider
       value={{
-        activeFolder,
-        uploadFolder,
         videos,
         isLoading,
         isPurging,
@@ -161,11 +101,8 @@ export const DriveProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         error,
         fetchVideos,
         loadMoreVideos,
-        selectFolder,
-        selectUploadFolder,
         deleteVideo,
         purgeExpired,
-        setFolderManually,
       }}
     >
       {children}

@@ -17,7 +17,6 @@ export const VideoList: React.FC = () => {
     nextPageToken,
     deleteVideo,
     purgeExpired,
-    activeFolder,
   } = useDrive();
 
   if (isLoading && videos.length === 0) {
@@ -56,7 +55,7 @@ export const VideoList: React.FC = () => {
           <Film className="w-4 h-4 text-indigo-400" />
           <span>
             Showing <strong className="text-white">{videos.length}</strong> videos in{' '}
-            <strong className="text-indigo-300">{activeFolder?.name || 'VidSetu_Videos'}</strong>
+            <strong className="text-indigo-300">VidSetu_Videos</strong>
           </span>
         </div>
 
