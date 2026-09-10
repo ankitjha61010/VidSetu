@@ -97,9 +97,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, title }) => {
           <span>Playing official trailer preview.</span>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 px-1">
-          <Info className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-          <span>Playing full feature stream. To change audio language (Hindi / Dual Audio) or subtitles, use the Audio/CC icon in player controls or switch servers above.</span>
+        <div className="flex items-start gap-2 text-[11px] text-slate-400 px-1 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/60">
+          <Info className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p>
+              Playing full feature stream. To change audio language (Hindi / Dual Audio) or subtitles, use the Audio/CC icon inside the player controls.
+            </p>
+            <p className="text-slate-500 text-[10px]">
+              <strong className="text-slate-400">Mobile Data (Jio/Airtel/5G) Tip:</strong> If Server 1 keeps loading on mobile data, tap <strong>Server 3 (MultiEmbed)</strong>, <strong>Server 4 (AutoEmbed)</strong>, or enable <strong>Private DNS</strong> (<code className="text-indigo-300">dns.google</code> or <code className="text-indigo-300">one.one.one.one</code>) in Phone Settings &gt; Connections.
+            </p>
+          </div>
         </div>
       )}
     </div>
