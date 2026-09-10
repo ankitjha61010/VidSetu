@@ -37,13 +37,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) loadProfile(session.user.id);
-      setIsLoading(false);
-    });
+    let mounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!mounted) return;
+        setSession(session);
+        if (session?.user) loadProfile(session.user.id);
+      })
+      .catch((err) => {
+        console.warn('Supabase auth session load failed (guest mode active):', err);
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSession(session);
       if (session?.user) {
         loadProfile(session.user.id);
@@ -52,7 +63,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => subscription.subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {

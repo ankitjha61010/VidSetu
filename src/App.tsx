@@ -33,16 +33,16 @@ export const App: React.FC = () => {
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
 
-                  <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-                  <Route path="/movies" element={<ProtectedRoute><BrowsePage mediaType="movie" /></ProtectedRoute>} />
-                  <Route path="/tv-shows" element={<ProtectedRoute><BrowsePage mediaType="tv" /></ProtectedRoute>} />
-                  <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-                  <Route path="/movie/:id" element={<ProtectedRoute><MovieDetailsPage /></ProtectedRoute>} />
-                  <Route path="/tv/:id" element={<ProtectedRoute><SeriesDetailsPage /></ProtectedRoute>} />
-                  <Route path="/watch/movie/:id" element={<ProtectedRoute><WatchPlayerPage mediaType="movie" /></ProtectedRoute>} />
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/movies" element={<BrowsePage mediaType="movie" />} />
+                  <Route path="/tv-shows" element={<BrowsePage mediaType="tv" />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/movie/:id" element={<MovieDetailsPage />} />
+                  <Route path="/tv/:id" element={<SeriesDetailsPage />} />
+                  <Route path="/watch/movie/:id" element={<WatchPlayerPage mediaType="movie" />} />
                   <Route
                     path="/watch/tv/:id/:season/:episode"
-                    element={<ProtectedRoute><WatchPlayerPage mediaType="tv" /></ProtectedRoute>}
+                    element={<WatchPlayerPage mediaType="tv" />}
                   />
                   <Route path="/spaces" element={<ProtectedRoute><WatchSpaceListPage /></ProtectedRoute>} />
                   <Route path="/spaces/:id" element={<ProtectedRoute><WatchSpaceDashboardPage /></ProtectedRoute>} />

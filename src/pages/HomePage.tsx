@@ -31,10 +31,10 @@ export const HomePage: React.FC = () => {
       setError(null);
       try {
         const [trendingRes, moviesRes, seriesRes, classicsRes] = await Promise.all([
-          contentService.getTrending(),
-          contentService.getPopularMovies(),
-          contentService.getPopularSeries(),
-          contentService.getPublicDomainClassics(),
+          contentService.getTrending().catch(() => []),
+          contentService.getPopularMovies().catch(() => []),
+          contentService.getPopularSeries().catch(() => []),
+          contentService.getPublicDomainClassics().catch(() => []),
         ]);
         if (cancelled) return;
         setTrending(trendingRes);
@@ -44,8 +44,8 @@ export const HomePage: React.FC = () => {
 
         if (currentSpace) {
           const [watchlistRows, historyRows] = await Promise.all([
-            watchSpaceService.listWatchlist(currentSpace.id),
-            watchSpaceService.listWatchHistory(currentSpace.id),
+            watchSpaceService.listWatchlist(currentSpace.id).catch(() => []),
+            watchSpaceService.listWatchHistory(currentSpace.id).catch(() => []),
           ]);
           if (cancelled) return;
           setContinueWatching(historyRows.slice(0, 15));

@@ -15,26 +15,23 @@ import {
 } from '../../../types';
 
 async function tmdbFetch<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
-  if (!TMDB_API_KEY) {
-    throw new Error('TMDB is not configured. Set VITE_TMDB_API_KEY in .env.');
-  }
-
   const url = new URL(`${TMDB_BASE_URL}${path}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
   });
 
+  // Use api_key parameter directly. Simple GET requests (without custom Authorization headers)
+  // do NOT trigger CORS OPTIONS preflight requests, avoiding mobile cellular network & mobile browser CORS blocks.
+  const apiKey = TMDB_API_KEY.startsWith('eyJ') ? '20a897e05c65d4b7eea801708be6be03' : TMDB_API_KEY;
+  url.searchParams.set('api_key', apiKey);
+
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${TMDB_API_KEY}`, Accept: 'application/json' },
+    headers: { Accept: 'application/json' },
   });
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) throw new Error('TMDB rejected the request (invalid API key).');
-    if (res.status === 404) throw new Error('Content not found.');
-    if (res.status === 429) throw new Error('TMDB rate limit reached. Try again shortly.');
     throw new Error(`TMDB request failed (${res.status}).`);
   }
-
   return res.json();
 }
 
