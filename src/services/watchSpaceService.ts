@@ -139,7 +139,19 @@ export const watchSpaceService = {
       .eq('watch_space_id', watchSpaceId)
       .order('last_watched_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(mapWatchHistoryItem);
+    
+    // Deduplicate by mediaType-tmdbId so each title only appears once at the newest position
+    const mapped = (data || []).map(mapWatchHistoryItem);
+    const seen = new Set<string>();
+    const unique: WatchHistoryItem[] = [];
+    for (const item of mapped) {
+      const key = `${item.mediaType}-${item.tmdbId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
   },
 
   async upsertWatchProgress(entry: {
@@ -152,8 +164,32 @@ export const watchSpaceService = {
     progressSeconds: number;
     durationSeconds: number;
   }): Promise<void> {
-    const { error } = await supabase.from('watch_history').upsert(
-      {
+    // Check if a record already exists for this movie/show in this watch space
+    const { data: existing } = await supabase
+      .from('watch_history')
+      .select('id')
+      .eq('watch_space_id', entry.watchSpaceId)
+      .eq('user_id', entry.userId)
+      .eq('tmdb_id', entry.tmdbId)
+      .eq('media_type', entry.mediaType)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      // Update existing record with newest timestamp so it moves to first position
+      const { error } = await supabase
+        .from('watch_history')
+        .update({
+          season: entry.season ?? null,
+          episode: entry.episode ?? null,
+          progress_seconds: entry.progressSeconds,
+          duration_seconds: entry.durationSeconds,
+          last_watched_at: new Date().toISOString(),
+        })
+        .eq('id', existing[0].id);
+      if (error) console.error('Failed to update watch progress:', error);
+    } else {
+      // Insert new record
+      const { error } = await supabase.from('watch_history').insert({
         watch_space_id: entry.watchSpaceId,
         user_id: entry.userId,
         tmdb_id: entry.tmdbId,
@@ -163,9 +199,8 @@ export const watchSpaceService = {
         progress_seconds: entry.progressSeconds,
         duration_seconds: entry.durationSeconds,
         last_watched_at: new Date().toISOString(),
-      },
-      { onConflict: 'watch_space_id,user_id,tmdb_id,media_type,season,episode' }
-    );
-    if (error) throw error;
+      });
+      if (error) console.error('Failed to insert watch progress:', error);
+    }
   },
 };

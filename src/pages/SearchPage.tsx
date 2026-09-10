@@ -62,7 +62,7 @@ export const SearchPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
           {results.map((item) => (
-            <MediaCard key={`${item.mediaType}-${item.id}`} item={item} />
+            <MediaCard key={`${item.mediaType}-${item.id}`} item={item} className="w-full" />
           ))}
         </div>
       )}

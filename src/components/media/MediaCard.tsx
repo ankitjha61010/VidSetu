@@ -8,14 +8,14 @@ interface MediaCardProps {
   className?: string;
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({ item, className = '' }) => {
+export const MediaCard: React.FC<MediaCardProps> = ({ item, className = 'w-[130px] sm:w-44' }) => {
   const href = item.mediaType === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`;
   const year = item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined;
 
   return (
     <Link
       to={href}
-      className={`group block w-full rounded-2xl overflow-hidden glass-panel-interactive border border-slate-800/80 shadow-md hover:shadow-indigo-500/10 transition-all ${className}`}
+      className={`group flex-shrink-0 rounded-2xl overflow-hidden glass-panel-interactive border border-slate-800/80 shadow-md hover:shadow-indigo-500/10 transition-all ${className}`}
     >
       <div className="relative w-full aspect-[2/3] bg-slate-900">
         {item.posterUrl ? (

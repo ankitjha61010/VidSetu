@@ -48,7 +48,18 @@ export const HomePage: React.FC = () => {
             watchSpaceService.listWatchHistory(currentSpace.id).catch(() => []),
           ]);
           if (cancelled) return;
-          setContinueWatching(historyRows.slice(0, 15));
+          
+          // Deduplicate history items so the most recently watched comes first without repeating
+          const seenHistory = new Set<string>();
+          const uniqueHistory: WatchHistoryItem[] = [];
+          for (const item of historyRows) {
+            const key = `${item.mediaType}-${item.tmdbId}`;
+            if (!seenHistory.has(key)) {
+              seenHistory.add(key);
+              uniqueHistory.push(item);
+            }
+          }
+          setContinueWatching(uniqueHistory.slice(0, 15));
 
           const watchlistItems = await Promise.all(
             watchlistRows.slice(0, 20).map((w) =>
@@ -96,7 +107,7 @@ export const HomePage: React.FC = () => {
   const hero = trending[0] ?? null;
 
   return (
-    <div className="space-y-6 sm:space-y-8 md:space-y-10 pb-8 sm:pb-12">
+    <div className="space-y-10 pb-12">
       <HeroBanner item={hero} />
 
       {continueWatching.length > 0 && (
@@ -124,8 +135,16 @@ const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items })
 
   useEffect(() => {
     let cancelled = false;
+    const seen = new Set<string>();
+    const uniqueItems = items.filter((h) => {
+      const key = `${h.mediaType}-${h.tmdbId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     Promise.all(
-      items.map((h) =>
+      uniqueItems.map((h) =>
         h.mediaType === 'movie'
           ? contentService.getMovieDetails(h.tmdbId).catch(() => null)
           : contentService.getSeriesDetails(h.tmdbId).catch(() => null)
@@ -137,6 +156,8 @@ const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items })
       cancelled = true;
     };
   }, [items]);
+
+  if (resolved.length === 0) return null;
 
   return <MediaRow title="Continue Watching" items={resolved} />;
 };

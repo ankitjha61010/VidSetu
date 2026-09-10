@@ -38,8 +38,11 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
 
+  const hasRecordedProgress = React.useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
+    const watchKey = `${mediaType}-${tmdbId}-${seasonNumber ?? 1}-${episodeNumber ?? 1}`;
 
     const load = async () => {
       setIsLoading(true);
@@ -71,7 +74,8 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
         if (cancelled) return;
         setSource(resolvedSource);
 
-        if (currentSpace && user) {
+        if (currentSpace && user && hasRecordedProgress.current !== watchKey) {
+          hasRecordedProgress.current = watchKey;
           watchSpaceService
             .upsertWatchProgress({
               watchSpaceId: currentSpace.id,
