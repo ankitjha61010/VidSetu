@@ -275,14 +275,20 @@ create policy "subscription plans are readable by anyone signed in"
   on public.subscription_plans for select
   using (auth.role() = 'authenticated');
 
+-- owner_id = auth.uid() is checked directly (not just membership) because INSERT ...
+-- RETURNING requires the new row to also satisfy the SELECT policy at insert time,
+-- before the add_owner_as_member trigger has had a chance to create the owner's
+-- membership row - without this, creating a Watch Space fails with a row-level
+-- security error even for the correct owner.
 drop policy if exists "members can read their watch spaces" on public.watch_spaces;
 create policy "members can read their watch spaces"
   on public.watch_spaces for select
-  using (public.is_watch_space_member(id, auth.uid()));
+  using (owner_id = auth.uid() or public.is_watch_space_member(id, auth.uid()));
 
 drop policy if exists "users can create watch spaces" on public.watch_spaces;
 create policy "users can create watch spaces"
   on public.watch_spaces for insert
+  to authenticated
   with check (owner_id = auth.uid());
 
 drop policy if exists "owners/admins can update their watch space" on public.watch_spaces;
