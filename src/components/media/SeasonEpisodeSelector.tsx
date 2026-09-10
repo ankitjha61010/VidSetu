@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Play } from 'lucide-react';
+import { Play, ChevronDown } from 'lucide-react';
 import { Episode, Season } from '../../types';
 
 interface SeasonEpisodeSelectorProps {
@@ -26,17 +26,20 @@ export const SeasonEpisodeSelector: React.FC<SeasonEpisodeSelectorProps> = ({
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-bold text-white">Episodes</h2>
-        <select
-          value={selectedSeason}
-          onChange={(e) => onSelectSeason(Number(e.target.value))}
-          className="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/60"
-        >
-          {seasons.map((s) => (
-            <option key={s.seasonNumber} value={s.seasonNumber}>
-              {s.name || `Season ${s.seasonNumber}`}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={selectedSeason}
+            onChange={(e) => onSelectSeason(Number(e.target.value))}
+            className="appearance-none pl-3 pr-8 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/60 cursor-pointer"
+          >
+            {seasons.map((s) => (
+              <option key={s.seasonNumber} value={s.seasonNumber}>
+                {s.name || `Season ${s.seasonNumber}`}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-200 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+        </div>
       </div>
 
       {isLoadingEpisodes ? (

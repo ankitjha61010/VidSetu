@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { contentService } from '../services/content/ContentService';
 import { playbackResolver } from '../services/content/playback/PlaybackResolver';
@@ -18,6 +18,7 @@ interface WatchPlayerPageProps {
 }
 
 export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) => {
+  const navigate = useNavigate();
   const { id, season, episode } = useParams<{ id: string; season?: string; episode?: string }>();
   const tmdbId = Number(id);
   const seasonNumber = season ? Number(season) : undefined;
@@ -112,12 +113,19 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
 
   const backHref = mediaType === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
 
+  const handleBackToDetails = () => {
+    navigate(backHref, { replace: true });
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <Link to={backHref} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+      <button
+        onClick={handleBackToDetails}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+      >
         <ArrowLeft className="w-4 h-4" />
         Back to Details
-      </Link>
+      </button>
 
       {isLoading ? (
         <div className="py-24">

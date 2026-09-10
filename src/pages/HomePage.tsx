@@ -96,7 +96,7 @@ export const HomePage: React.FC = () => {
   const hero = trending[0] ?? null;
 
   return (
-    <div className="space-y-10 pb-12">
+    <div className="space-y-6 sm:space-y-8 md:space-y-10 pb-8 sm:pb-12">
       <HeroBanner item={hero} />
 
       {continueWatching.length > 0 && (
