@@ -8,7 +8,9 @@ export const PLAYBACK_PROVIDERS: string[] = ((import.meta.env.VITE_PLAYBACK_PROV
   .map((s) => s.trim())
   .filter(Boolean);
 
-export const TMDB_API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string) || '';
+export const TMDB_API_KEY =
+  (import.meta.env.VITE_TMDB_API_KEY as string) ||
+  'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMGE4OTdlMDVjNjVkNGI3ZWVhODAxNzA4YmU2YmUwMyIsIm5iZiI6MTc4OTAyNTE0My4zODUsInN1YiI6IjZhYTI1Yjc3MTQ0NTY1MmJkNDNjZGVjNiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.zAMkqtlWxog65FFM_GBMXC4h9C3PPAsYGosvYCxWQw4';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
