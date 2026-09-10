@@ -35,7 +35,10 @@ export class TrailerPlaybackProvider {
       return {
         provider: 'YOUTUBE_TRAILER',
         type: 'iframe',
-        url: `https://www.youtube.com/embed/${trailer.key}?autoplay=1&rel=0`,
+        // rel=0 (no unrelated suggested videos), modestbranding=1 (smaller YouTube logo),
+        // iv_load_policy=3 (no annotation overlays) - trims the chrome as far as YouTube's
+        // embed terms allow; the player itself can't be fully de-branded.
+        url: `https://www.youtube.com/embed/${trailer.key}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3`,
         contentId: String(request.tmdbId),
         season: request.season,
         episode: request.episode,
