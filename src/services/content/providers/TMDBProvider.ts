@@ -1,6 +1,6 @@
 import { ContentProvider } from '../ContentProvider';
 import { withCache } from '../cache';
-import { TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL } from '../config';
+import { TMDB_API_KEY, TMDB_IMAGE_BASE_URL } from '../config';
 import {
   CastMember,
   DiscoverFilters,
@@ -14,25 +14,58 @@ import {
   TVSeries,
 } from '../../../types';
 
+const TMDB_MIRRORS = [
+  'https://api.themoviedb.org/3',
+  'https://api.tmdb.org/3',
+];
+
 async function tmdbFetch<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
-  const url = new URL(`${TMDB_BASE_URL}${path}`);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
-  });
-
-  // Use api_key parameter directly. Simple GET requests (without custom Authorization headers)
-  // do NOT trigger CORS OPTIONS preflight requests, avoiding mobile cellular network & mobile browser CORS blocks.
   const apiKey = TMDB_API_KEY.startsWith('eyJ') ? '20a897e05c65d4b7eea801708be6be03' : TMDB_API_KEY;
-  url.searchParams.set('api_key', apiKey);
+  let lastError: any = null;
 
-  const res = await fetch(url.toString(), {
-    headers: { Accept: 'application/json' },
-  });
+  for (const baseUrl of TMDB_MIRRORS) {
+    try {
+      const url = new URL(`${baseUrl}${path}`);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
+      });
+      url.searchParams.set('api_key', apiKey);
 
-  if (!res.ok) {
-    throw new Error(`TMDB request failed (${res.status}).`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err: any) {
+      lastError = err;
+    }
   }
-  return res.json();
+
+  // Mobile cellular carrier (Jio/Airtel) CORS/DNS bypass proxy fallback
+  try {
+    const directUrl = new URL(`https://api.themoviedb.org/3${path}`);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') directUrl.searchParams.set(key, String(value));
+    });
+    directUrl.searchParams.set('api_key', apiKey);
+
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl.toString())}`;
+    const proxyRes = await fetch(proxyUrl, { headers: { Accept: 'application/json' } });
+    if (proxyRes.ok) {
+      return await proxyRes.json();
+    }
+  } catch {
+    // ignore proxy error
+  }
+
+  throw lastError || new Error('TMDB request failed across all mirrors.');
 }
 
 function posterUrl(path: string | null): string | undefined {
