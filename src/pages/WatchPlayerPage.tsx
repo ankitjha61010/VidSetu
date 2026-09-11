@@ -74,12 +74,14 @@ export const WatchPlayerPage: React.FC<WatchPlayerPageProps> = ({ mediaType }) =
         if (cancelled) return;
         setSource(resolvedSource);
 
-        if (currentSpace && user && hasRecordedProgress.current !== watchKey) {
+        if (hasRecordedProgress.current !== watchKey) {
           hasRecordedProgress.current = watchKey;
+          const spaceId = currentSpace?.id || 'default-space';
+          const userId = user?.id || 'guest-user';
           watchSpaceService
             .upsertWatchProgress({
-              watchSpaceId: currentSpace.id,
-              userId: user.id,
+              watchSpaceId: spaceId,
+              userId: userId,
               tmdbId,
               mediaType,
               season: seasonNumber,

@@ -148,18 +148,30 @@ export const watchSpaceService = {
   },
 
   async listWatchHistory(watchSpaceId: string): Promise<WatchHistoryItem[]> {
-    const { data, error } = await supabase
-      .from('watch_history')
-      .select('*')
-      .eq('watch_space_id', watchSpaceId)
-      .order('last_watched_at', { ascending: false });
-    if (error) throw error;
-    
-    // Deduplicate by mediaType-tmdbId so each title only appears once at the newest position
-    const mapped = (data || []).map(mapWatchHistoryItem);
+    let remoteHistory: WatchHistoryItem[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('watch_history')
+        .select('*')
+        .eq('watch_space_id', watchSpaceId)
+        .order('last_watched_at', { ascending: false });
+      if (!error && data) {
+        remoteHistory = data.map(mapWatchHistoryItem);
+      }
+    } catch {
+      // Ignore Supabase error and fallback to localStorage
+    }
+
+    let localHistory: WatchHistoryItem[] = [];
+    try {
+      const localData = localStorage.getItem(`vidsetu:history:${watchSpaceId}`);
+      if (localData) localHistory = JSON.parse(localData);
+    } catch {}
+
+    const combined = [...remoteHistory, ...localHistory];
     const seen = new Set<string>();
     const unique: WatchHistoryItem[] = [];
-    for (const item of mapped) {
+    for (const item of combined) {
       const key = `${item.mediaType}-${item.tmdbId}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -179,43 +191,67 @@ export const watchSpaceService = {
     progressSeconds: number;
     durationSeconds: number;
   }): Promise<void> {
-    // Check if a record already exists for this movie/show in this watch space
-    const { data: existing } = await supabase
-      .from('watch_history')
-      .select('id')
-      .eq('watch_space_id', entry.watchSpaceId)
-      .eq('user_id', entry.userId)
-      .eq('tmdb_id', entry.tmdbId)
-      .eq('media_type', entry.mediaType)
-      .limit(1);
+    // 1. Save to local storage fallback
+    try {
+      const key = `vidsetu:history:${entry.watchSpaceId}`;
+      const existingStr = localStorage.getItem(key);
+      let items: WatchHistoryItem[] = existingStr ? JSON.parse(existingStr) : [];
+      const itemKey = `${entry.mediaType}-${entry.tmdbId}`;
+      items = items.filter((i) => `${i.mediaType}-${i.tmdbId}` !== itemKey);
+      items.unshift({
+        id: `local-${Date.now()}`,
+        watchSpaceId: entry.watchSpaceId,
+        userId: entry.userId,
+        tmdbId: entry.tmdbId,
+        mediaType: entry.mediaType,
+        season: entry.season,
+        episode: entry.episode,
+        progressSeconds: entry.progressSeconds,
+        durationSeconds: entry.durationSeconds,
+        lastWatchedAt: new Date().toISOString(),
+      });
+      localStorage.setItem(key, items.slice(0, 20).toString ? JSON.stringify(items.slice(0, 20)) : '');
+    } catch (e) {
+      console.error('Failed to update local watch progress:', e);
+    }
 
-    if (existing && existing.length > 0) {
-      // Update existing record with newest timestamp so it moves to first position
-      const { error } = await supabase
+    // 2. Save to Supabase
+    try {
+      const { data: existing } = await supabase
         .from('watch_history')
-        .update({
+        .select('id')
+        .eq('watch_space_id', entry.watchSpaceId)
+        .eq('user_id', entry.userId)
+        .eq('tmdb_id', entry.tmdbId)
+        .eq('media_type', entry.mediaType)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        await supabase
+          .from('watch_history')
+          .update({
+            season: entry.season ?? null,
+            episode: entry.episode ?? null,
+            progress_seconds: entry.progressSeconds,
+            duration_seconds: entry.durationSeconds,
+            last_watched_at: new Date().toISOString(),
+          })
+          .eq('id', existing[0].id);
+      } else {
+        await supabase.from('watch_history').insert({
+          watch_space_id: entry.watchSpaceId,
+          user_id: entry.userId,
+          tmdb_id: entry.tmdbId,
+          media_type: entry.mediaType,
           season: entry.season ?? null,
           episode: entry.episode ?? null,
           progress_seconds: entry.progressSeconds,
           duration_seconds: entry.durationSeconds,
           last_watched_at: new Date().toISOString(),
-        })
-        .eq('id', existing[0].id);
-      if (error) console.error('Failed to update watch progress:', error);
-    } else {
-      // Insert new record
-      const { error } = await supabase.from('watch_history').insert({
-        watch_space_id: entry.watchSpaceId,
-        user_id: entry.userId,
-        tmdb_id: entry.tmdbId,
-        media_type: entry.mediaType,
-        season: entry.season ?? null,
-        episode: entry.episode ?? null,
-        progress_seconds: entry.progressSeconds,
-        duration_seconds: entry.durationSeconds,
-        last_watched_at: new Date().toISOString(),
-      });
-      if (error) console.error('Failed to insert watch progress:', error);
+        });
+      }
+    } catch (err) {
+      console.error('Failed to sync watch progress to Supabase:', err);
     }
   },
 };

@@ -41,40 +41,41 @@ export const HomePage: React.FC = () => {
         setPopularMovies(moviesRes);
         setPopularSeries(seriesRes);
         setClassics(classicsRes);
+        setIsLoading(false);
 
-        if (currentSpace) {
-          const [watchlistRows, historyRows] = await Promise.all([
-            watchSpaceService.listWatchlist(currentSpace.id).catch(() => []),
-            watchSpaceService.listWatchHistory(currentSpace.id).catch(() => []),
-          ]);
-          if (cancelled) return;
-          
-          // Deduplicate history items so the most recently watched comes first without repeating
-          const seenHistory = new Set<string>();
-          const uniqueHistory: WatchHistoryItem[] = [];
-          for (const item of historyRows) {
-            const key = `${item.mediaType}-${item.tmdbId}`;
-            if (!seenHistory.has(key)) {
-              seenHistory.add(key);
-              uniqueHistory.push(item);
-            }
+        // Fetch user space data asynchronously to eliminate initial load delay
+        const spaceId = currentSpace?.id || 'default-space';
+        const [watchlistRows, historyRows] = await Promise.all([
+          watchSpaceService.listWatchlist(spaceId).catch(() => []),
+          watchSpaceService.listWatchHistory(spaceId).catch(() => []),
+        ]);
+        if (cancelled) return;
+        
+        const seenHistory = new Set<string>();
+        const uniqueHistory: WatchHistoryItem[] = [];
+        for (const item of historyRows) {
+          const key = `${item.mediaType}-${item.tmdbId}`;
+          if (!seenHistory.has(key)) {
+            seenHistory.add(key);
+            uniqueHistory.push(item);
           }
-          setContinueWatching(uniqueHistory.slice(0, 15));
-
-          const watchlistItems = await Promise.all(
-            watchlistRows.slice(0, 20).map((w) =>
-              w.mediaType === 'movie'
-                ? contentService.getMovieDetails(w.tmdbId).catch(() => null)
-                : contentService.getSeriesDetails(w.tmdbId).catch(() => null)
-            )
-          );
-          if (cancelled) return;
-          setWatchlist(watchlistItems.filter(Boolean) as MediaItem[]);
         }
+        setContinueWatching(uniqueHistory.slice(0, 15));
+
+        const watchlistItems = await Promise.all(
+          watchlistRows.slice(0, 20).map((w) =>
+            w.mediaType === 'movie'
+              ? contentService.getMovieDetails(w.tmdbId).catch(() => null)
+              : contentService.getSeriesDetails(w.tmdbId).catch(() => null)
+          )
+        );
+        if (cancelled) return;
+        setWatchlist(watchlistItems.filter(Boolean) as MediaItem[]);
       } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load content.');
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setError(err.message || 'Failed to load content.');
+          setIsLoading(false);
+        }
       }
     };
 
@@ -162,6 +163,7 @@ const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items })
       return true;
     });
 
+    // Fetch TMDB details in parallel with fast failover so it displays fast
     Promise.all(
       uniqueItems.map((h) =>
         h.mediaType === 'movie'
@@ -178,5 +180,12 @@ const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items })
 
   if (resolved.length === 0) return null;
 
-  return <MediaRow title="Continue Watching" items={resolved} cardClassName="w-28 sm:w-36" />;
+  return (
+    <MediaRow
+      title="Continue Watching"
+      items={resolved}
+      aspectVariant="landscape"
+      cardClassName="w-36 sm:w-44 md:w-48"
+    />
+  );
 };

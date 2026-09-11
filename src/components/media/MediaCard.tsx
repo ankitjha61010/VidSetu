@@ -6,21 +6,26 @@ import { MediaItem } from '../../types';
 interface MediaCardProps {
   item: MediaItem;
   className?: string;
+  aspectVariant?: 'poster' | 'landscape';
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({ item, className = 'w-[130px] sm:w-44' }) => {
+export const MediaCard: React.FC<MediaCardProps> = ({ item, className, aspectVariant = 'poster' }) => {
   const href = item.mediaType === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`;
   const year = item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined;
+  const isLandscape = aspectVariant === 'landscape';
+  const cardWidth = className || (isLandscape ? 'w-36 sm:w-44 md:w-48' : 'w-24 sm:w-28 md:w-32');
+  const aspectClass = isLandscape ? 'aspect-[16/9]' : 'aspect-[2/3]';
+  const imageUrl = isLandscape ? (item.backdropUrl || item.posterUrl) : (item.posterUrl || item.backdropUrl);
 
   return (
     <Link
       to={href}
-      className={`group flex-shrink-0 rounded-2xl overflow-hidden glass-panel-interactive border border-slate-800/80 shadow-md hover:shadow-indigo-500/10 transition-all ${className}`}
+      className={`group flex-shrink-0 rounded-xl overflow-hidden glass-panel-interactive border border-slate-800/80 shadow-md hover:shadow-indigo-500/10 transition-all ${cardWidth}`}
     >
-      <div className="relative w-full aspect-[2/3] bg-slate-900">
-        {item.posterUrl ? (
+      <div className={`relative w-full ${aspectClass} bg-slate-900 overflow-hidden`}>
+        {imageUrl ? (
           <img
-            src={item.posterUrl}
+            src={imageUrl}
             alt={item.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
