@@ -210,7 +210,7 @@ export const watchSpaceService = {
         durationSeconds: entry.durationSeconds,
         lastWatchedAt: new Date().toISOString(),
       });
-      localStorage.setItem(key, items.slice(0, 20).toString ? JSON.stringify(items.slice(0, 20)) : '');
+      localStorage.setItem(key, JSON.stringify(items.slice(0, 20)));
     } catch (e) {
       console.error('Failed to update local watch progress:', e);
     }
