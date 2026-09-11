@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Play, Plus, Check, ArrowLeft, Clock, Calendar, Share2 } from 'lucide-react';
+import { Play, Plus, Check, ArrowLeft, Clock, Calendar, Share2, Languages } from 'lucide-react';
 import { contentService } from '../services/content/ContentService';
 import { watchSpaceService } from '../services/watchSpaceService';
 import { useAuth } from '../context/AuthContext';
@@ -150,6 +150,9 @@ export const MovieDetailsPage: React.FC = () => {
               )}
               <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-semibold border border-amber-500/20">
                 ★ {movie.rating.toFixed(1)}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                <Languages className="w-3.5 h-3.5 text-amber-400" /> Hindi / Multi-Audio & Subtitles
               </span>
             </div>
 

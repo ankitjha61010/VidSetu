@@ -97,6 +97,7 @@ export type PlaybackProviderName = 'FULL_STREAM' | 'YOUTUBE_TRAILER' | 'PAID_STR
 export interface PlaybackServer {
   name: string;
   url: string;
+  language?: 'en' | 'hi' | 'dual';
 }
 
 export interface PlaybackRequest {
@@ -115,6 +116,7 @@ export interface PlaybackSource {
   episode?: number;
   isTrailer?: boolean;
   servers?: PlaybackServer[];
+  hindiServers?: PlaybackServer[];
 }
 
 // --- Watch Space domain model (subscription-ready, no limits hard-coded) ---
