@@ -19,7 +19,7 @@ export interface ContentProvider {
   getPopularSeries(page?: number): Promise<TVSeries[]>;
   discoverMovies(filters: DiscoverFilters): Promise<Movie[]>;
   discoverSeries(filters: DiscoverFilters): Promise<TVSeries[]>;
-  getGenres(mediaType: 'movie' | 'tv'): Promise<Genre[]>;
+  getGenres(mediaType: 'movie' | 'tv', isKids?: boolean): Promise<Genre[]>;
   searchMovies(query: string): Promise<SearchResult[]>;
   searchSeries(query: string): Promise<SearchResult[]>;
   getMovieDetails(id: number): Promise<MovieDetails>;

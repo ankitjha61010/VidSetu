@@ -123,8 +123,19 @@ export class TMDBProvider implements ContentProvider {
   async getTrending() {
     const data = await withCache('tmdb:trending', () => tmdbFetch<any>('/trending/all/week'));
     return (data.results || [])
-      .filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv')
+      .filter((r: any) => (r.media_type === 'movie' || r.media_type === 'tv') && (!r.genre_ids || !r.genre_ids.includes(10762)))
       .map((r: any) => (r.media_type === 'movie' ? toMovie(r) : toSeries(r)));
+  }
+
+  async getKidsTrending() {
+    const data = await withCache('tmdb:trending-kids', () =>
+      tmdbFetch<any>('/discover/movie', {
+        with_genres: '16|10751',
+        sort_by: 'popularity.desc',
+        page: 1,
+      })
+    );
+    return (data.results || []).map(toMovie);
   }
 
   async getPopularMovies(page = 1): Promise<Movie[]> {
@@ -134,16 +145,44 @@ export class TMDBProvider implements ContentProvider {
     return (data.results || []).map(toMovie);
   }
 
+  async getKidsPopularMovies(page = 1): Promise<Movie[]> {
+    const data = await withCache(`tmdb:kids-popular-movies:${page}`, () =>
+      tmdbFetch<any>('/discover/movie', {
+        with_genres: '16|10751',
+        sort_by: 'popularity.desc',
+        page,
+      })
+    );
+    return (data.results || []).map(toMovie);
+  }
+
   async getPopularSeries(page = 1): Promise<TVSeries[]> {
     const data = await withCache(`tmdb:popular-tv:${page}`, () => tmdbFetch<any>('/tv/popular', { page }));
+    // Filter out kids-only series from normal TV list
+    return (data.results || []).filter((s: any) => !s.genre_ids || !s.genre_ids.includes(10762)).map(toSeries);
+  }
+
+  async getKidsPopularSeries(page = 1): Promise<TVSeries[]> {
+    const data = await withCache(`tmdb:kids-popular-tv:${page}`, () =>
+      tmdbFetch<any>('/discover/tv', {
+        with_genres: '16|10751|10762',
+        sort_by: 'popularity.desc',
+        page,
+      })
+    );
     return (data.results || []).map(toSeries);
   }
 
   async discoverMovies(filters: DiscoverFilters): Promise<Movie[]> {
     const key = `tmdb:discover-movie:${JSON.stringify(filters)}`;
+    const genres = filters.isKids
+      ? (filters.genreId ? String(filters.genreId) : '16|10751')
+      : (filters.genreId ? String(filters.genreId) : undefined);
+
     const data = await withCache(key, () =>
       tmdbFetch<any>('/discover/movie', {
-        with_genres: filters.genreId,
+        with_genres: genres,
+        without_genres: filters.isKids ? undefined : '10762',
         primary_release_year: filters.year,
         with_original_language: filters.language,
         sort_by: filters.sortBy || 'popularity.desc',
@@ -155,9 +194,14 @@ export class TMDBProvider implements ContentProvider {
 
   async discoverSeries(filters: DiscoverFilters): Promise<TVSeries[]> {
     const key = `tmdb:discover-tv:${JSON.stringify(filters)}`;
+    const genres = filters.isKids
+      ? (filters.genreId ? String(filters.genreId) : '16|10751|10762')
+      : (filters.genreId ? String(filters.genreId) : undefined);
+
     const data = await withCache(key, () =>
       tmdbFetch<any>('/discover/tv', {
-        with_genres: filters.genreId,
+        with_genres: genres,
+        without_genres: filters.isKids ? undefined : '10762',
         first_air_date_year: filters.year,
         with_original_language: filters.language,
         sort_by: filters.sortBy || 'popularity.desc',
@@ -167,9 +211,16 @@ export class TMDBProvider implements ContentProvider {
     return (data.results || []).map(toSeries);
   }
 
-  async getGenres(mediaType: 'movie' | 'tv'): Promise<Genre[]> {
+  async getGenres(mediaType: 'movie' | 'tv', isKids: boolean = false): Promise<Genre[]> {
     const data = await withCache(`tmdb:genres:${mediaType}`, () => tmdbFetch<any>(`/genre/${mediaType}/list`), 60 * 60 * 1000);
-    return data.genres || [];
+    const allGenres: Genre[] = data.genres || [];
+    if (isKids) {
+      // Return child-friendly genres
+      const kidFriendlyIds = [16, 10751, 10762, 12, 35, 14, 10759]; // Animation, Family, Kids, Adventure, Comedy, Fantasy, Action & Adventure
+      return allGenres.filter((g) => kidFriendlyIds.includes(g.id));
+    }
+    // For normal spaces, exclude kids-only genre (10762)
+    return allGenres.filter((g) => g.id !== 10762);
   }
 
   async searchMovies(query: string): Promise<SearchResult[]> {

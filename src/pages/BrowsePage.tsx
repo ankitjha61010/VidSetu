@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { contentService } from '../services/content/ContentService';
+import { useWatchSpace } from '../context/WatchSpaceContext';
 import { CategoryFilterBar } from '../components/media/CategoryFilterBar';
 import { MediaCard } from '../components/media/MediaCard';
 import { LoadingState } from '../components/common/LoadingState';
@@ -11,6 +12,7 @@ interface BrowsePageProps {
 }
 
 export const BrowsePage: React.FC<BrowsePageProps> = ({ mediaType }) => {
+  const { isKidsSpace } = useWatchSpace();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filters, setFilters] = useState<DiscoverFilters>({ sortBy: 'popularity.desc' });
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -19,28 +21,28 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({ mediaType }) => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
-    contentService.getGenres(mediaType).then(setGenres);
-  }, [mediaType]);
+    contentService.getGenres(mediaType, isKidsSpace).then(setGenres);
+  }, [mediaType, isKidsSpace]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setPage(1);
     const discover = mediaType === 'movie' ? contentService.discoverMovies : contentService.discoverSeries;
-    discover({ ...filters, page: 1 })
+    discover({ ...filters, isKids: isKidsSpace, page: 1 })
       .then((res) => !cancelled && setItems(res))
       .finally(() => !cancelled && setIsLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [mediaType, filters]);
+  }, [mediaType, filters, isKidsSpace]);
 
   const loadMore = async () => {
     setIsLoadingMore(true);
     try {
       const nextPage = page + 1;
       const discover = mediaType === 'movie' ? contentService.discoverMovies : contentService.discoverSeries;
-      const res = await discover({ ...filters, page: nextPage });
+      const res = await discover({ ...filters, isKids: isKidsSpace, page: nextPage });
       setItems((prev) => [...prev, ...res]);
       setPage(nextPage);
     } finally {
@@ -48,11 +50,26 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({ mediaType }) => {
     }
   };
 
+  const pageTitle = isKidsSpace
+    ? mediaType === 'movie'
+      ? 'Kids Movies'
+      : 'Kids Cartoons & Shows'
+    : mediaType === 'movie'
+    ? 'Movies'
+    : 'TV Shows';
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-        {mediaType === 'movie' ? 'Movies' : 'TV Shows'}
-      </h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          {pageTitle}
+        </h1>
+        {isKidsSpace && (
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+            👶 Kids Space
+          </span>
+        )}
+      </div>
 
       <CategoryFilterBar genres={genres} filters={filters} onChange={setFilters} />
 

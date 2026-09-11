@@ -87,6 +87,7 @@ export interface DiscoverFilters {
   language?: string; // ISO 639-1 original-language code, e.g. 'en', 'hi', 'ta'
   sortBy?: 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'primary_release_date.desc';
   page?: number;
+  isKids?: boolean;
 }
 
 // --- Playback ---
@@ -134,6 +135,7 @@ export interface WatchSpace {
   ownerId: string;
   subscriptionPlanId?: string | null;
   memberLimit: number;
+  isKids?: boolean;
   createdAt: string;
 }
 

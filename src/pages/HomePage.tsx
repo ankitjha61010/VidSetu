@@ -12,7 +12,7 @@ import { Movie, TVSeries, MediaItem, WatchHistoryItem } from '../types';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
-  const { currentSpace, isLoading: isSpaceLoading, spaces } = useWatchSpace();
+  const { currentSpace, isKidsSpace, isLoading: isSpaceLoading, spaces } = useWatchSpace();
 
   const [trending, setTrending] = useState<MediaItem[]>([]);
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
@@ -31,10 +31,10 @@ export const HomePage: React.FC = () => {
       setError(null);
       try {
         const [trendingRes, moviesRes, seriesRes, classicsRes] = await Promise.all([
-          contentService.getTrending().catch(() => []),
-          contentService.getPopularMovies().catch(() => []),
-          contentService.getPopularSeries().catch(() => []),
-          contentService.getPublicDomainClassics().catch(() => []),
+          contentService.getTrending(isKidsSpace).catch(() => []),
+          contentService.getPopularMovies(1, isKidsSpace).catch(() => []),
+          contentService.getPopularSeries(1, isKidsSpace).catch(() => []),
+          isKidsSpace ? Promise.resolve([]) : contentService.getPublicDomainClassics().catch(() => []),
         ]);
         if (cancelled) return;
         setTrending(trendingRes);
@@ -82,7 +82,7 @@ export const HomePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentSpace]);
+  }, [currentSpace, isKidsSpace]);
 
   if (!isSpaceLoading && user && spaces.length === 0) {
     return <Navigate to="/spaces" replace />;
@@ -99,7 +99,11 @@ export const HomePage: React.FC = () => {
   if (isLoading && trending.length === 0) {
     return (
       <div className="py-24">
-        <LoadingState message="Loading VidSetu..." subMessage="Fetching trending movies and shows" size="lg" />
+        <LoadingState
+          message={isKidsSpace ? "Loading Kids Space 👶..." : "Loading VidSetu..."}
+          subMessage={isKidsSpace ? "Fetching cartoons & animated hits" : "Fetching trending movies and shows"}
+          size="lg"
+        />
       </div>
     );
   }
@@ -114,17 +118,32 @@ export const HomePage: React.FC = () => {
         <ContinueWatchingRow items={continueWatching} />
       )}
 
+      {isKidsSpace ? (
+        <>
+          <MediaRow title="Animated Hits & Blockbusters" items={popularMovies} />
+          <MediaRow title="Kids & Family Shows" items={popularSeries} />
+          <MediaRow title="Trending in Kids Space" items={trending.slice(1, 21)} />
+        </>
+      ) : (
+        <>
+          <MediaRow
+            title="Free Full Movies (Public Domain Classics)"
+            items={classics}
+          />
+          <MediaRow title="Trending Now" items={trending.slice(1, 21)} />
+          <MediaRow title="Popular Movies" items={popularMovies} />
+          <MediaRow title="Popular TV Shows" items={popularSeries} />
+        </>
+      )}
+
       <MediaRow
-        title="Free Full Movies (Public Domain Classics)"
-        items={classics}
-      />
-      <MediaRow title="Trending Now" items={trending.slice(1, 21)} />
-      <MediaRow title="Popular Movies" items={popularMovies} />
-      <MediaRow title="Popular TV Shows" items={popularSeries} />
-      <MediaRow
-        title="My Watchlist"
+        title={isKidsSpace ? "Kids Watchlist" : "My Watchlist"}
         items={watchlist}
-        emptyMessage="Nothing saved yet — add a movie or show from its details page."
+        emptyMessage={
+          isKidsSpace
+            ? "No kids shows saved yet — add animated movies and cartoons from their details page."
+            : "Nothing saved yet — add a movie or show from its details page."
+        }
       />
     </div>
   );
@@ -159,5 +178,5 @@ const ContinueWatchingRow: React.FC<{ items: WatchHistoryItem[] }> = ({ items })
 
   if (resolved.length === 0) return null;
 
-  return <MediaRow title="Continue Watching" items={resolved} />;
+  return <MediaRow title="Continue Watching" items={resolved} cardClassName="w-28 sm:w-36" />;
 };

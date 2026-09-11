@@ -17,15 +17,18 @@ import {
 // The ONLY module the UI should import for content data. It knows which
 // provider(s) are active; components never talk to TMDB/TVmaze directly.
 class ContentServiceImpl {
-  async getTrending(): Promise<(Movie | TVSeries)[]> {
+  async getTrending(isKids: boolean = false): Promise<(Movie | TVSeries)[]> {
+    if (isKids) return tmdbProvider.getKidsTrending();
     return tmdbProvider.getTrending();
   }
 
-  async getPopularMovies(page?: number): Promise<Movie[]> {
+  async getPopularMovies(page?: number, isKids: boolean = false): Promise<Movie[]> {
+    if (isKids) return tmdbProvider.getKidsPopularMovies(page);
     return tmdbProvider.getPopularMovies(page);
   }
 
-  async getPopularSeries(page?: number): Promise<TVSeries[]> {
+  async getPopularSeries(page?: number, isKids: boolean = false): Promise<TVSeries[]> {
+    if (isKids) return tmdbProvider.getKidsPopularSeries(page);
     return tmdbProvider.getPopularSeries(page);
   }
 
@@ -37,8 +40,8 @@ class ContentServiceImpl {
     return tmdbProvider.discoverSeries(filters);
   }
 
-  async getGenres(mediaType: 'movie' | 'tv'): Promise<Genre[]> {
-    return tmdbProvider.getGenres(mediaType);
+  async getGenres(mediaType: 'movie' | 'tv', isKids: boolean = false): Promise<Genre[]> {
+    return tmdbProvider.getGenres(mediaType, isKids);
   }
 
   async search(query: string): Promise<SearchResult[]> {

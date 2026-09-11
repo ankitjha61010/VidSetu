@@ -8,12 +8,26 @@ import {
 } from '../types';
 
 function mapWatchSpace(row: any): WatchSpace {
+  const rawName = row.name || '';
+  const isKids = Boolean(
+    row.is_kids ||
+    rawName.startsWith('👶 ') ||
+    rawName.startsWith('[Kids] ') ||
+    rawName.endsWith(' [Kids]') ||
+    row.subscription_plan_id === 'KIDS'
+  );
+  const cleanName = rawName
+    .replace(/^👶\s*/, '')
+    .replace(/^\[Kids\]\s*/, '')
+    .replace(/\s*\[Kids\]$/, '');
+
   return {
     id: row.id,
-    name: row.name,
+    name: cleanName || rawName,
     ownerId: row.owner_id,
     subscriptionPlanId: row.subscription_plan_id,
     memberLimit: row.member_limit,
+    isKids,
     createdAt: row.created_at,
   };
 }
@@ -77,10 +91,11 @@ export const watchSpaceService = {
     return (data || []).map((row: any) => mapWatchSpace(row.watch_spaces)).filter(Boolean);
   },
 
-  async createWatchSpace(name: string, ownerId: string): Promise<WatchSpace> {
+  async createWatchSpace(name: string, ownerId: string, isKids: boolean = false): Promise<WatchSpace> {
+    const formattedName = isKids ? `👶 ${name.trim()}` : name.trim();
     const { data, error } = await supabase
       .from('watch_spaces')
-      .insert({ name, owner_id: ownerId, subscription_plan_id: 'FREE' })
+      .insert({ name: formattedName, owner_id: ownerId, subscription_plan_id: 'FREE' })
       .select()
       .single();
     if (error) throw error;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Navigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, Lock, ShieldCheck, ShieldAlert, Settings } from 'lucide-react';
 import { watchSpaceService } from '../../services/watchSpaceService';
 import { contentService } from '../../services/content/ContentService';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
@@ -18,7 +18,7 @@ export const WatchSpaceDashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get('tab') as Tab) || 'overview';
 
-  const { spaces, setCurrentSpaceId } = useWatchSpace();
+  const { spaces, setCurrentSpaceId, isParentalPinEnabled, openParentalPinModal } = useWatchSpace();
   const { showToast } = useToast();
 
   const space = spaces.find((s) => s.id === id);
@@ -116,11 +116,51 @@ export const WatchSpaceDashboardPage: React.FC = () => {
       ) : tab === 'members' ? (
         <MembersTable space={space} members={members} onInvite={() => setShowInvite(true)} />
       ) : (
-        <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-          <h3 className="text-sm font-bold text-white">Settings</h3>
-          <p className="text-xs text-slate-400">Owner: {members.find((m) => m.role === 'OWNER')?.profile?.email || space.ownerId}</p>
-          <p className="text-xs text-slate-400">Member limit: {space.memberLimit} (from your subscription plan)</p>
-          <p className="text-xs text-slate-400">Created: {new Date(space.createdAt).toLocaleDateString()}</p>
+        <div className="space-y-4">
+          <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
+            <h3 className="text-sm font-bold text-white">Space Details</h3>
+            <p className="text-xs text-slate-400">Owner: {members.find((m) => m.role === 'OWNER')?.profile?.email || space.ownerId}</p>
+            <p className="text-xs text-slate-400">Space Type: {space.isKids ? '👶 Kids Space' : 'General Watch Space'}</p>
+            <p className="text-xs text-slate-400">Member limit: {space.memberLimit} (from your subscription plan)</p>
+            <p className="text-xs text-slate-400">Created: {new Date(space.createdAt).toLocaleDateString()}</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Parental PIN Security</h4>
+                  <p className="text-xs text-slate-400">Set, modify, or remove the 4-digit PIN for Kids Spaces.</p>
+                </div>
+              </div>
+
+              {isParentalPinEnabled ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <ShieldCheck className="w-3 h-3" /> Enabled
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                  <ShieldAlert className="w-3 h-3" /> Disabled
+                </span>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Default PIN: <code className="text-indigo-300 font-mono font-bold">1234</code>
+              </span>
+              <button
+                onClick={() => openParentalPinModal('changePin')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Change / Set PIN
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
