@@ -45,6 +45,18 @@ export const MovieDetailsPage: React.FC = () => {
       try {
         const details = await contentService.getMovieDetails(movieId);
         if (cancelled) return;
+
+        // Restriction check for Kids Space
+        if (currentSpace?.isKids) {
+          const strictKidGenres = [16, 10751, 10762];
+          const isKidSafe = details.genres && details.genres.some((g) => strictKidGenres.includes(g.id));
+          if (!isKidSafe) {
+            setError('This title is restricted in Kids Space 🔒');
+            setIsLoading(false);
+            return;
+          }
+        }
+
         setMovie(details);
 
         Promise.all(details.relatedIds.slice(0, 12).map((rid) => contentService.getMovieDetails(rid).catch(() => null)))

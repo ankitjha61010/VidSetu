@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { WatchSpaceProvider } from './context/WatchSpaceContext';
 import { ToastProvider } from './context/ToastContext';
@@ -20,56 +20,65 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 
+const AppContent: React.FC = () => {
+  const location = useLocation();
+  const isWatchSpacePage = location.pathname.startsWith('/spaces');
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#0a0e17] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+      {!isWatchSpacePage && <Header />}
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-32 md:pb-8">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+
+          <Route path="/" element={<HomePage />} />
+          <Route path="/movies" element={<BrowsePage mediaType="movie" />} />
+          <Route path="/tv-shows" element={<BrowsePage mediaType="tv" />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/movie/:id" element={<MovieDetailsPage />} />
+          <Route path="/tv/:id" element={<SeriesDetailsPage />} />
+          <Route path="/watch/movie/:id" element={<WatchPlayerPage mediaType="movie" />} />
+          <Route
+            path="/watch/tv/:id/:season/:episode"
+            element={<WatchPlayerPage mediaType="tv" />}
+          />
+          <Route path="/spaces" element={<ProtectedRoute><WatchSpaceListPage /></ProtectedRoute>} />
+          <Route path="/spaces/:id" element={<ProtectedRoute><WatchSpaceDashboardPage /></ProtectedRoute>} />
+
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+
+      <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-slate-400">
+          <p>
+            VidSetu • Powered by <span className="text-indigo-400 font-semibold">Abhishek Kashyap</span>
+          </p>
+          <div className="flex items-center gap-3 text-slate-400">
+            <Link to="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</Link>
+            <span>•</span>
+            <Link to="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</Link>
+          </div>
+        </div>
+      </footer>
+
+      <MobileNavigation />
+      <ToastContainer />
+    </div>
+  );
+};
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
         <WatchSpaceProvider>
           <ToastProvider>
-            <div className="min-h-screen flex flex-col bg-[#0a0e17] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-              <Header />
-
-              <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-32 md:pb-8">
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/movies" element={<BrowsePage mediaType="movie" />} />
-                  <Route path="/tv-shows" element={<BrowsePage mediaType="tv" />} />
-                  <Route path="/search" element={<SearchPage />} />
-                  <Route path="/movie/:id" element={<MovieDetailsPage />} />
-                  <Route path="/tv/:id" element={<SeriesDetailsPage />} />
-                  <Route path="/watch/movie/:id" element={<WatchPlayerPage mediaType="movie" />} />
-                  <Route
-                    path="/watch/tv/:id/:season/:episode"
-                    element={<WatchPlayerPage mediaType="tv" />}
-                  />
-                  <Route path="/spaces" element={<ProtectedRoute><WatchSpaceListPage /></ProtectedRoute>} />
-                  <Route path="/spaces/:id" element={<ProtectedRoute><WatchSpaceDashboardPage /></ProtectedRoute>} />
-
-                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                  <Route path="/terms" element={<TermsPage />} />
-                  <Route path="/404" element={<NotFoundPage />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </main>
-
-              <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-slate-400">
-                  <p>
-                    VidSetu • Powered by <span className="text-indigo-400 font-semibold">Abhishek Kashyap</span>
-                  </p>
-                  <div className="flex items-center gap-3 text-slate-400">
-                    <Link to="/privacy-policy" className="hover:text-indigo-400 transition-colors">Privacy Policy</Link>
-                    <span>•</span>
-                    <Link to="/terms" className="hover:text-indigo-400 transition-colors">Terms of Service</Link>
-                  </div>
-                </div>
-              </footer>
-
-              <MobileNavigation />
-              <ToastContainer />
-            </div>
+            <AppContent />
           </ToastProvider>
         </WatchSpaceProvider>
       </AuthProvider>

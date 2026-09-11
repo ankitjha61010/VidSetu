@@ -8,6 +8,7 @@ export const MobileNavigation: React.FC = () => {
   const { session } = useAuth();
 
   if (!session) return null;
+  if (location.pathname.startsWith('/spaces')) return null;
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },

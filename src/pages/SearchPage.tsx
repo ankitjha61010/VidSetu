@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { contentService } from '../services/content/ContentService';
+import { useWatchSpace } from '../context/WatchSpaceContext';
 import { MediaCard } from '../components/media/MediaCard';
 import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
 import { SearchResult } from '../types';
 
 export const SearchPage: React.FC = () => {
+  const { isKidsSpace } = useWatchSpace();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
   const [query, setQuery] = useState(initialQuery);
@@ -24,7 +26,7 @@ export const SearchPage: React.FC = () => {
     let cancelled = false;
     setIsLoading(true);
     contentService
-      .search(q)
+      .search(q, isKidsSpace)
       .then((res) => {
         if (!cancelled) setResults(res);
       })
@@ -34,7 +36,7 @@ export const SearchPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [searchParams, isKidsSpace]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

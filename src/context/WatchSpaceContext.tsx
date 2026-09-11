@@ -41,7 +41,7 @@ export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children
   });
   const [isParentalPinEnabled, setIsParentalPinEnabledState] = useState<boolean>(() => {
     const saved = localStorage.getItem(PARENTAL_PIN_ENABLED_KEY);
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinModalInitialView, setPinModalInitialView] = useState<'unlock' | 'changePin' | 'removePin'>('unlock');

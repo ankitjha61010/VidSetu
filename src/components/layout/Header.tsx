@@ -69,7 +69,7 @@ export const Header: React.FC = () => {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search movies and TV shows..."
+              placeholder={currentSpace?.isKids ? "Search kids cartoons and animation..." : "Search movies and TV shows..."}
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900/70 border border-slate-800 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60"
             />
           </form>

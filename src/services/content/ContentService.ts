@@ -44,11 +44,11 @@ class ContentServiceImpl {
     return tmdbProvider.getGenres(mediaType, isKids);
   }
 
-  async search(query: string): Promise<SearchResult[]> {
+  async search(query: string, isKids: boolean = false): Promise<SearchResult[]> {
     if (!query.trim()) return [];
     const [movies, series] = await Promise.all([
-      tmdbProvider.searchMovies(query),
-      tmdbProvider.searchSeries(query),
+      tmdbProvider.searchMovies(query, isKids),
+      tmdbProvider.searchSeries(query, isKids),
     ]);
     return [...movies, ...series].sort((a, b) => b.rating - a.rating);
   }

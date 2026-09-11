@@ -223,16 +223,36 @@ export class TMDBProvider implements ContentProvider {
     return allGenres.filter((g) => g.id !== 10762);
   }
 
-  async searchMovies(query: string): Promise<SearchResult[]> {
+  async searchMovies(query: string, isKids: boolean = false): Promise<SearchResult[]> {
     if (!query.trim()) return [];
-    const data = await tmdbFetch<any>('/search/movie', { query });
-    return (data.results || []).map(toMovie);
+    const params: Record<string, string | number | undefined> = { query };
+    if (isKids) params.include_adult = 'false';
+    const data = await tmdbFetch<any>('/search/movie', params);
+    const results = (data.results || []).map(toMovie);
+    if (isKids) {
+      const strictKidGenres = [16, 10751, 10762]; // Animation, Family, Kids
+      return results.filter((item: SearchResult) => {
+        if ((item as any).adult) return false;
+        return item.genreIds && item.genreIds.some((gId: number) => strictKidGenres.includes(gId));
+      });
+    }
+    return results;
   }
 
-  async searchSeries(query: string): Promise<SearchResult[]> {
+  async searchSeries(query: string, isKids: boolean = false): Promise<SearchResult[]> {
     if (!query.trim()) return [];
-    const data = await tmdbFetch<any>('/search/tv', { query });
-    return (data.results || []).map(toSeries);
+    const params: Record<string, string | number | undefined> = { query };
+    if (isKids) params.include_adult = 'false';
+    const data = await tmdbFetch<any>('/search/tv', params);
+    const results = (data.results || []).map(toSeries);
+    if (isKids) {
+      const strictKidGenres = [16, 10751, 10762]; // Animation, Family, Kids
+      return results.filter((item: SearchResult) => {
+        if ((item as any).adult) return false;
+        return item.genreIds && item.genreIds.some((gId: number) => strictKidGenres.includes(gId));
+      });
+    }
+    return results;
   }
 
   async getMovieDetails(id: number): Promise<MovieDetails> {
