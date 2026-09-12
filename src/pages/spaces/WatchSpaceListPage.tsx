@@ -211,14 +211,15 @@ export const WatchSpaceListPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                <div className="space-y-2 pt-2 border-t border-slate-800/60">
+                  {/* Primary Action Button */}
                   <button
                     type="button"
                     onClick={() => {
                       requestSpaceSwitch(space.id);
                       navigate('/');
                     }}
-                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition-all ${
+                    className={`w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                       isActive
                         ? spaceIsKids
                           ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30'
@@ -228,37 +229,52 @@ export const WatchSpaceListPage: React.FC = () => {
                         : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
                     }`}
                   >
-                    {isActive ? 'Browsing as Active' : spaceIsKids ? 'Enter Kids Space' : 'Select Space'}
+                    {isActive ? (
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Browsing as Active
+                      </span>
+                    ) : spaceIsKids ? (
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        Enter Kids Space
+                      </span>
+                    ) : (
+                      'Select Space'
+                    )}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => openParentalPinModal('changePin')}
-                    title="Set or Change Security PIN"
-                    className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Set PIN</span>
-                  </button>
-
-                  <Link
-                    to={`/spaces/${space.id}`}
-                    className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    Manage
-                  </Link>
-
-                  {space.ownerId === profile?.id && (
+                  {/* Secondary Tools Row */}
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setDeletingSpace(space)}
-                      title="Delete Space"
-                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 border border-slate-700/80 text-xs font-semibold transition-all"
+                      onClick={() => openParentalPinModal('changePin')}
+                      title="Set or Change Security PIN"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all whitespace-nowrap"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Set PIN</span>
                     </button>
-                  )}
+
+                    <Link
+                      to={`/spaces/${space.id}`}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all whitespace-nowrap"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Manage</span>
+                    </Link>
+
+                    {space.ownerId === profile?.id && (
+                      <button
+                        type="button"
+                        onClick={() => setDeletingSpace(space)}
+                        title="Delete Space"
+                        className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 border border-slate-700/80 text-xs font-semibold transition-all flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
