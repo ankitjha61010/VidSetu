@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { watchSpaceService } from '../services/watchSpaceService';
 import { WatchSpace } from '../types';
@@ -16,7 +17,7 @@ interface WatchSpaceContextType {
   isParentalPinEnabled: boolean;
   parentalPin: string;
   setCurrentSpaceId: (id: string) => void;
-  requestSpaceSwitch: (id: string) => void;
+  requestSpaceSwitch: (id: string, options?: { forceCheck?: boolean }) => void;
   createWatchSpace: (name: string, isKids?: boolean) => Promise<WatchSpace>;
   updateWatchSpaceName: (spaceId: string, name: string, isKids?: boolean) => Promise<WatchSpace>;
   deleteWatchSpace: (spaceId: string) => Promise<void>;
@@ -30,6 +31,7 @@ interface WatchSpaceContextType {
 const WatchSpaceContext = createContext<WatchSpaceContextType | undefined>(undefined);
 
 export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [spaces, setSpaces] = useState<WatchSpace[]>([]);
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(
@@ -95,13 +97,15 @@ export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children
   const currentSpace = spaces.find((s) => s.id === currentSpaceId) ?? null;
   const isKidsSpace = Boolean(currentSpace?.isKids);
 
-  const requestSpaceSwitch = (targetSpaceId: string) => {
-    if (targetSpaceId === currentSpaceId) return;
-
+  const requestSpaceSwitch = (targetSpaceId: string, options?: { forceCheck?: boolean }) => {
     const targetSpace = spaces.find((s) => s.id === targetSpaceId);
     
-    // Check if switching OUT of a Kids Space into a non-Kids space
-    if (currentSpace?.isKids && !targetSpace?.isKids && isParentalPinEnabled) {
+    // Check if switching OUT of a Kids Space into a non-Kids space,
+    // OR entering a non-Kids space when PIN protection is active and requested
+    const isExitingKids = Boolean(currentSpace?.isKids && !targetSpace?.isKids);
+    const isProtectedEnter = Boolean(!targetSpace?.isKids && options?.forceCheck);
+
+    if ((isExitingKids || isProtectedEnter) && isParentalPinEnabled) {
       setPendingTargetSpaceId(targetSpaceId);
       setPinModalInitialView('unlock');
       setIsPinModalOpen(true);
@@ -118,6 +122,7 @@ export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children
       setPendingTargetSpaceId(null);
     }
     setIsPinModalOpen(false);
+    navigate('/');
   };
 
   const createWatchSpace = async (name: string, isKids: boolean = false): Promise<WatchSpace> => {

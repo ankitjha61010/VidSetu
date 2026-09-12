@@ -19,6 +19,7 @@ export const WatchSpaceListPage: React.FC = () => {
     updateWatchSpaceName,
     deleteWatchSpace,
     requestSpaceSwitch,
+    isParentalPinEnabled,
     openParentalPinModal,
   } = useWatchSpace();
   const { showToast } = useToast();
@@ -216,8 +217,12 @@ export const WatchSpaceListPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      requestSpaceSwitch(space.id);
-                      navigate('/');
+                      if (!spaceIsKids && isParentalPinEnabled) {
+                        requestSpaceSwitch(space.id, { forceCheck: true });
+                      } else {
+                        requestSpaceSwitch(space.id);
+                        navigate('/');
+                      }
                     }}
                     className={`w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                       isActive
