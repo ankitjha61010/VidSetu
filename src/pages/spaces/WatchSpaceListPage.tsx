@@ -152,8 +152,12 @@ export const WatchSpaceListPage: React.FC = () => {
                 onClick={(e) => {
                   // Avoid triggering when clicking internal buttons/links like PIN or Manage
                   if ((e.target as HTMLElement).closest('button, a')) return;
-                  requestSpaceSwitch(space.id);
-                  navigate('/');
+                  if (!spaceIsKids && isParentalPinEnabled) {
+                    requestSpaceSwitch(space.id, { forceCheck: true });
+                  } else {
+                    requestSpaceSwitch(space.id);
+                    navigate('/');
+                  }
                 }}
                 className={`glass-panel p-4 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between gap-4 cursor-pointer relative overflow-hidden ${
                   isActive

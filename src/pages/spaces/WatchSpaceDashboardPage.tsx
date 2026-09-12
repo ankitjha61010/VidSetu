@@ -23,7 +23,7 @@ export const WatchSpaceDashboardPage: React.FC = () => {
 
   const {
     spaces,
-    setCurrentSpaceId,
+    requestSpaceSwitch,
     updateWatchSpaceName,
     deleteWatchSpace,
     isParentalPinEnabled,
@@ -144,7 +144,14 @@ export const WatchSpaceDashboardPage: React.FC = () => {
             </button>
           </div>
           <button
-            onClick={() => setCurrentSpaceId(space.id)}
+            onClick={() => {
+              if (!space.isKids && isParentalPinEnabled) {
+                requestSpaceSwitch(space.id, { forceCheck: true });
+              } else {
+                requestSpaceSwitch(space.id);
+                navigate('/');
+              }
+            }}
             className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold mt-1"
           >
             Set as active Watch Space →
