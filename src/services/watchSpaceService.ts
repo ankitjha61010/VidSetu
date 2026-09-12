@@ -102,6 +102,18 @@ export const watchSpaceService = {
     return mapWatchSpace(data);
   },
 
+  async updateWatchSpaceName(watchSpaceId: string, name: string, isKids: boolean = false): Promise<WatchSpace> {
+    const formattedName = isKids ? `👶 ${name.trim()}` : name.trim();
+    const { data, error } = await supabase
+      .from('watch_spaces')
+      .update({ name: formattedName })
+      .eq('id', watchSpaceId)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapWatchSpace(data);
+  },
+
   async listMembers(watchSpaceId: string): Promise<WatchSpaceMember[]> {
     const { data, error } = await supabase
       .from('watch_space_members')

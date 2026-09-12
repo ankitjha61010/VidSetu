@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Users, Crown, X, Settings, CheckCircle2, Tv, Sparkles, Film, Lock } from 'lucide-react';
+import { Plus, Users, Crown, X, Settings, CheckCircle2, Tv, Sparkles, Film, Lock, Edit3 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
 import { useToast } from '../../context/ToastContext';
 import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
+import { WatchSpace } from '../../types';
 
 export const WatchSpaceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export const WatchSpaceListPage: React.FC = () => {
     currentSpace,
     isLoading,
     createWatchSpace,
+    updateWatchSpaceName,
     requestSpaceSwitch,
     openParentalPinModal,
   } = useWatchSpace();
@@ -23,6 +25,11 @@ export const WatchSpaceListPage: React.FC = () => {
   const [name, setName] = useState('');
   const [isKids, setIsKids] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Edit Space Name state
+  const [editingSpace, setEditingSpace] = useState<WatchSpace | null>(null);
+  const [editName, setEditName] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +45,27 @@ export const WatchSpaceListPage: React.FC = () => {
       showToast('Failed to Create', err.message, 'error');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleOpenEdit = (space: WatchSpace) => {
+    setEditingSpace(space);
+    setEditName(space.name);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSpace || !editName.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      await updateWatchSpaceName(editingSpace.id, editName.trim(), editingSpace.isKids);
+      showToast('Space Updated', editName.trim(), 'success');
+      setEditingSpace(null);
+      setEditName('');
+    } catch (err: any) {
+      showToast('Failed to Update', err.message, 'error');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -133,6 +161,14 @@ export const WatchSpaceListPage: React.FC = () => {
                       {space.ownerId === profile?.id && (
                         <Crown className="w-4 h-4 text-amber-400 flex-shrink-0" />
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(space)}
+                        title="Edit Space Name"
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -197,6 +233,60 @@ export const WatchSpaceListPage: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Edit Space Name Modal */}
+      {editingSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-4">
+            <button
+              onClick={() => setEditingSpace(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-indigo-400" />
+                Edit Space Name
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Rename your {editingSpace.isKids ? 'Kids Space' : 'Watch Space'}.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Space Name</label>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter space name"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSpace(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit || !editName.trim()}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+                >
+                  {isSavingEdit ? 'Saving...' : 'Save Name'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

@@ -88,7 +88,7 @@ export const ParentalPinModal: React.FC<ParentalPinModalProps> = ({
 
   const handleSaveNewPin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (oldPin !== currentPin) {
+    if (isPinEnabled && oldPin !== currentPin) {
       setError('Current PIN is incorrect.');
       setOldPin('');
       return;
@@ -98,9 +98,11 @@ export const ParentalPinModal: React.FC<ParentalPinModalProps> = ({
       return;
     }
     onUpdatePin(newPin);
-    setView('unlock');
-    setPin('');
+    if (!isPinEnabled && onEnablePin) {
+      onEnablePin();
+    }
     setError(null);
+    onClose();
   };
 
   return (

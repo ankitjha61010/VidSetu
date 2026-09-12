@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Navigate } from 'react-router-dom';
-import { X, Lock, ShieldCheck, ShieldAlert, Settings } from 'lucide-react';
+import { X, Lock, ShieldCheck, ShieldAlert, Settings, Edit3 } from 'lucide-react';
 import { watchSpaceService } from '../../services/watchSpaceService';
 import { contentService } from '../../services/content/ContentService';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
@@ -18,7 +18,7 @@ export const WatchSpaceDashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get('tab') as Tab) || 'overview';
 
-  const { spaces, setCurrentSpaceId, isParentalPinEnabled, openParentalPinModal } = useWatchSpace();
+  const { spaces, setCurrentSpaceId, updateWatchSpaceName, isParentalPinEnabled, openParentalPinModal } = useWatchSpace();
   const { showToast } = useToast();
 
   const space = spaces.find((s) => s.id === id);
@@ -28,6 +28,26 @@ export const WatchSpaceDashboardPage: React.FC = () => {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+
+  // Edit Space Name state
+  const [showEditName, setShowEditName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!space || !editName.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      await updateWatchSpaceName(space.id, editName.trim(), space.isKids);
+      showToast('Space Updated', editName.trim(), 'success');
+      setShowEditName(false);
+    } catch (err: any) {
+      showToast('Failed to Update', err.message, 'error');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -81,14 +101,28 @@ export const WatchSpaceDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">{space.name}</h1>
-        <button
-          onClick={() => setCurrentSpaceId(space.id)}
-          className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold mt-1"
-        >
-          Set as active Watch Space →
-        </button>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">{space.name}</h1>
+            <button
+              onClick={() => {
+                setEditName(space.name);
+                setShowEditName(true);
+              }}
+              title="Edit Space Name"
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => setCurrentSpaceId(space.id)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold mt-1"
+          >
+            Set as active Watch Space →
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-2xl border border-slate-800/80 w-fit">
@@ -193,6 +227,60 @@ export const WatchSpaceDashboardPage: React.FC = () => {
               >
                 {isInviting ? 'Inviting...' : 'Invite'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Space Name Modal */}
+      {showEditName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-4">
+            <button
+              onClick={() => setShowEditName(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-indigo-400" />
+                Edit Space Name
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Rename your {space.isKids ? 'Kids Space' : 'Watch Space'}.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Space Name</label>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter space name"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditName(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit || !editName.trim()}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+                >
+                  {isSavingEdit ? 'Saving...' : 'Save Name'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
