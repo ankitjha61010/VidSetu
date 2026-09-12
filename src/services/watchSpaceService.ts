@@ -114,6 +114,44 @@ export const watchSpaceService = {
     return mapWatchSpace(data);
   },
 
+  async deleteWatchSpace(watchSpaceId: string): Promise<void> {
+    // 1. Delete associated watchlist items
+    try {
+      await supabase.from('watchlist_items').delete().eq('watch_space_id', watchSpaceId);
+    } catch (e) {
+      console.error('Failed to delete watchlist items:', e);
+    }
+
+    // 2. Delete associated watch history
+    try {
+      await supabase.from('watch_history').delete().eq('watch_space_id', watchSpaceId);
+    } catch (e) {
+      console.error('Failed to delete watch history:', e);
+    }
+
+    // 3. Delete associated space members
+    try {
+      await supabase.from('watch_space_members').delete().eq('watch_space_id', watchSpaceId);
+    } catch (e) {
+      console.error('Failed to delete space members:', e);
+    }
+
+    // 4. Delete the watch space itself
+    const { error } = await supabase.from('watch_spaces').delete().eq('id', watchSpaceId);
+    if (error) throw error;
+
+    // 5. Clean up local storage data
+    try {
+      localStorage.removeItem(`vidsetu:history:${watchSpaceId}`);
+      const currentSpaceKey = 'vidsetu:currentWatchSpaceId';
+      if (localStorage.getItem(currentSpaceKey) === watchSpaceId) {
+        localStorage.removeItem(currentSpaceKey);
+      }
+    } catch (e) {
+      console.error('Failed to clean up local storage:', e);
+    }
+  },
+
   async listMembers(watchSpaceId: string): Promise<WatchSpaceMember[]> {
     const { data, error } = await supabase
       .from('watch_space_members')

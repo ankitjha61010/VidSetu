@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams, Navigate } from 'react-router-dom';
-import { X, Lock, ShieldCheck, ShieldAlert, Settings, Edit3 } from 'lucide-react';
+import { useParams, useSearchParams, Navigate, useNavigate } from 'react-router-dom';
+import { X, Lock, ShieldCheck, ShieldAlert, Settings, Edit3, Trash2, AlertTriangle } from 'lucide-react';
 import { watchSpaceService } from '../../services/watchSpaceService';
 import { contentService } from '../../services/content/ContentService';
+import { useAuth } from '../../context/AuthContext';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
 import { useToast } from '../../context/ToastContext';
 import { MediaRow } from '../../components/media/MediaRow';
@@ -15,10 +16,19 @@ type Tab = (typeof TABS)[number];
 
 export const WatchSpaceDashboardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get('tab') as Tab) || 'overview';
 
-  const { spaces, setCurrentSpaceId, updateWatchSpaceName, isParentalPinEnabled, openParentalPinModal } = useWatchSpace();
+  const {
+    spaces,
+    setCurrentSpaceId,
+    updateWatchSpaceName,
+    deleteWatchSpace,
+    isParentalPinEnabled,
+    openParentalPinModal,
+  } = useWatchSpace();
   const { showToast } = useToast();
 
   const space = spaces.find((s) => s.id === id);
@@ -33,6 +43,23 @@ export const WatchSpaceDashboardPage: React.FC = () => {
   const [showEditName, setShowEditName] = useState(false);
   const [editName, setEditName] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Delete Space state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteSpace = async () => {
+    if (!space) return;
+    setIsDeleting(true);
+    try {
+      await deleteWatchSpace(space.id);
+      showToast('Space Deleted', `${space.name} and all associated data have been removed.`, 'success');
+      navigate('/spaces');
+    } catch (err: any) {
+      showToast('Failed to Delete', err.message, 'error');
+      setIsDeleting(false);
+    }
+  };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,6 +222,34 @@ export const WatchSpaceDashboardPage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Danger Zone: Delete Space */}
+          {space.ownerId === profile?.id && (
+            <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Delete Watch Space</h4>
+                    <p className="text-xs text-slate-400">
+                      Permanently delete this space and all associated watchlists, history, and member data.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all flex-shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Space
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -282,6 +337,60 @@ export const WatchSpaceDashboardPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Space Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-4">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Watch Space?</h3>
+                <p className="text-xs text-rose-400 font-semibold mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs text-slate-300">
+              <p>
+                Deleting <strong className="text-white font-bold">"{space.name}"</strong> will permanently delete:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                <li>Watchlist and saved movies/series</li>
+                <li>Continue Watching history and playback progress</li>
+                <li>Space memberships and shared settings</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSpace}
+                disabled={isDeleting}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {isDeleting ? 'Deleting Everything...' : 'Delete Everything'}
+              </button>
+            </div>
           </div>
         </div>
       )}

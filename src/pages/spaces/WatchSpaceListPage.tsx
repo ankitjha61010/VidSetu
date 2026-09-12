@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Users, Crown, X, Settings, CheckCircle2, Tv, Sparkles, Film, Lock, Edit3 } from 'lucide-react';
+import { Plus, Users, Crown, X, Settings, CheckCircle2, Tv, Sparkles, Film, Lock, Edit3, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useWatchSpace } from '../../context/WatchSpaceContext';
 import { useToast } from '../../context/ToastContext';
@@ -17,6 +17,7 @@ export const WatchSpaceListPage: React.FC = () => {
     isLoading,
     createWatchSpace,
     updateWatchSpaceName,
+    deleteWatchSpace,
     requestSpaceSwitch,
     openParentalPinModal,
   } = useWatchSpace();
@@ -30,6 +31,10 @@ export const WatchSpaceListPage: React.FC = () => {
   const [editingSpace, setEditingSpace] = useState<WatchSpace | null>(null);
   const [editName, setEditName] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Delete Space state
+  const [deletingSpace, setDeletingSpace] = useState<WatchSpace | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +74,20 @@ export const WatchSpaceListPage: React.FC = () => {
     }
   };
 
+  const handleDeleteSpace = async () => {
+    if (!deletingSpace) return;
+    setIsDeleting(true);
+    try {
+      await deleteWatchSpace(deletingSpace.id);
+      showToast('Space Deleted', `${deletingSpace.name} and all associated data have been removed.`, 'success');
+      setDeletingSpace(null);
+    } catch (err: any) {
+      showToast('Failed to Delete', err.message, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="py-24">
@@ -86,16 +105,16 @@ export const WatchSpaceListPage: React.FC = () => {
             Signed in as <span className="text-slate-200 font-medium">{profile?.name || profile?.email}</span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => {
               setIsKids(false);
               setShowCreate(true);
             }}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition-all"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-indigo-600/30 transition-all whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
-            Create Watch Space
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+            <span>Create Space</span>
           </button>
 
           <button
@@ -103,10 +122,10 @@ export const WatchSpaceListPage: React.FC = () => {
               setIsKids(true);
               setShowCreate(true);
             }}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 font-bold text-xs sm:text-sm border border-amber-500/40 shadow-xl shadow-amber-950/20 transition-all"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 font-bold text-xs sm:text-sm border border-amber-500/40 shadow-lg shadow-amber-950/20 transition-all whitespace-nowrap"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            Create Kids Space 👶
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 flex-shrink-0" />
+            <span>Kids Space 👶</span>
           </button>
         </div>
       </div>
@@ -229,6 +248,17 @@ export const WatchSpaceListPage: React.FC = () => {
                     <Settings className="w-3.5 h-3.5" />
                     Manage
                   </Link>
+
+                  {space.ownerId === profile?.id && (
+                    <button
+                      type="button"
+                      onClick={() => setDeletingSpace(space)}
+                      title="Delete Space"
+                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 border border-slate-700/80 text-xs font-semibold transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -286,6 +316,60 @@ export const WatchSpaceListPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Space Confirmation Modal */}
+      {deletingSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-4">
+            <button
+              onClick={() => setDeletingSpace(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Watch Space?</h3>
+                <p className="text-xs text-rose-400 font-semibold mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs text-slate-300">
+              <p>
+                Deleting <strong className="text-white font-bold">"{deletingSpace.name}"</strong> will permanently delete:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                <li>Watchlist and saved movies/series</li>
+                <li>Continue Watching history and playback progress</li>
+                <li>Space memberships and shared settings</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingSpace(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSpace}
+                disabled={isDeleting}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {isDeleting ? 'Deleting Everything...' : 'Delete Everything'}
+              </button>
+            </div>
           </div>
         </div>
       )}

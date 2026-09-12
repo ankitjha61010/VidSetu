@@ -19,6 +19,7 @@ interface WatchSpaceContextType {
   requestSpaceSwitch: (id: string) => void;
   createWatchSpace: (name: string, isKids?: boolean) => Promise<WatchSpace>;
   updateWatchSpaceName: (spaceId: string, name: string, isKids?: boolean) => Promise<WatchSpace>;
+  deleteWatchSpace: (spaceId: string) => Promise<void>;
   updateParentalPin: (pin: string) => void;
   disableParentalPin: () => void;
   enableParentalPin: () => void;
@@ -134,6 +135,16 @@ export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children
     return updated;
   };
 
+  const deleteWatchSpace = async (spaceId: string): Promise<void> => {
+    if (!user) throw new Error('You must be signed in to delete a Watch Space.');
+    await watchSpaceService.deleteWatchSpace(spaceId);
+    if (currentSpaceId === spaceId) {
+      setCurrentSpaceIdState(null);
+      localStorage.removeItem(CURRENT_SPACE_KEY);
+    }
+    await refresh();
+  };
+
   const openParentalPinModal = (mode: 'unlock' | 'changePin' | 'removePin' = 'changePin') => {
     setPendingTargetSpaceId(null);
     setPinModalInitialView(mode);
@@ -153,6 +164,7 @@ export const WatchSpaceProvider: React.FC<{ children: ReactNode }> = ({ children
         requestSpaceSwitch,
         createWatchSpace,
         updateWatchSpaceName,
+        deleteWatchSpace,
         updateParentalPin,
         disableParentalPin,
         enableParentalPin,
